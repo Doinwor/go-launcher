@@ -57,31 +57,33 @@ func main() {
 
 	srv := server.New(authMgr, profileStore, settingsMgr, launchCfg)
 
-	staticDir := findStaticDir()
 	var embeddedFS fs.FS
-	if staticDir == "" {
-		sub, err := fs.Sub(webFiles, "web")
-		if err != nil {
-			log.L().Error("failed to create embedded filesystem", "error", err)
+	sub, err := fs.Sub(webFiles, "web")
+	if err != nil {
+		log.L().Error("failed to create embedded filesystem", "error", err)
+		staticDir := findStaticDir()
+		if staticDir == "" {
 			os.Exit(1)
 		}
+		log.L().Warn("using static web directory", "path", staticDir)
+	} else {
 		embeddedFS = sub
+		log.L().Info("using embedded web files")
 	}
-	router := srv.SetupRouter(staticDir, embeddedFS)
+	router := srv.SetupRouter("", embeddedFS)
 
 	port := "8080"
 	if p := os.Getenv("LAUNCHER_PORT"); p != "" {
 		port = p
 	}
 
-	// Проверка: не занят ли порт другим лаунчером
+	// РџСЂРѕРІРµСЂРєР°: РЅРµ Р·Р°РЅСЏС‚ Р»Рё РїРѕСЂС‚ РґСЂСѓРіРёРј Р»Р°СѓРЅС‡РµСЂРѕРј
 	addr := ":" + port
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.L().Error("port " + port + " already in use — возможно, лаунчер уже запущен")
-		fmt.Fprintf(os.Stderr, "ОШИБКА: порт %s уже занят. Возможно, лаунчер уже запущен.\n", port)
-		fmt.Fprintf(os.Stderr, "Завершите предыдущий процесс или укажите другой порт через LAUNCHER_PORT.\n")
-		os.Exit(1)
+		log.L().Info("port " + port + " already in use вЂ” РѕС‚РєСЂС‹РІР°РµРј Р±СЂР°СѓР·РµСЂ Рё РІС‹С…РѕРґРёРј")
+		_ = open.Browser("http://localhost:" + port)
+		return
 	}
 	ln.Close()
 
@@ -116,7 +118,7 @@ func main() {
 	}
 	log.L().Info("shutting down", "cause", shutdownCause)
 
-	// Отменить все активные установки
+	// РћС‚РјРµРЅРёС‚СЊ РІСЃРµ Р°РєС‚РёРІРЅС‹Рµ СѓСЃС‚Р°РЅРѕРІРєРё
 	log.L().Info("cancelling active installations")
 	srv.CancelAllInstallations()
 
@@ -142,13 +144,13 @@ func recoverPanic() {
 			msg = err.Error()
 		}
 		log.L().Error("FATAL PANIC", "panic", r, "stack", string(debug.Stack()))
-		os.Stderr.WriteString("\n═══════════════════════════════════════════\n")
-		os.Stderr.WriteString("  ПРОИЗОШЛА КРИТИЧЕСКАЯ ОШИБКА\n")
-		os.Stderr.WriteString("═══════════════════════════════════════════\n")
+		os.Stderr.WriteString("\nв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ\n")
+		os.Stderr.WriteString("  РџР РћРР—РћРЁР›Рђ РљР РРўРР§Р•РЎРљРђРЇ РћРЁРР‘РљРђ\n")
+		os.Stderr.WriteString("в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ\n")
 		os.Stderr.WriteString("  " + msg + "\n\n")
-		os.Stderr.WriteString("  Пожалуйста, отправьте файл launcher.log\n")
-		os.Stderr.WriteString("  разработчику для исправления проблемы.\n")
-		os.Stderr.WriteString("═══════════════════════════════════════════\n\n")
+		os.Stderr.WriteString("  РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РѕС‚РїСЂР°РІСЊС‚Рµ С„Р°Р№Р» launcher.log\n")
+		os.Stderr.WriteString("  СЂР°Р·СЂР°Р±РѕС‚С‡РёРєСѓ РґР»СЏ РёСЃРїСЂР°РІР»РµРЅРёСЏ РїСЂРѕР±Р»РµРјС‹.\n")
+		os.Stderr.WriteString("в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ\n\n")
 		os.Exit(1)
 	}
 }
