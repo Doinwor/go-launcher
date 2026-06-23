@@ -5,7 +5,7 @@ dist/
 *.exe.old
 *.log
 *.zip
-launcher
+/launcher
 .install_id
 .DS_Store
 Thumbs.db
