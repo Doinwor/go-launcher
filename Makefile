@@ -1,6 +1,6 @@
-.PHONY: build test run clean pack lint
+.PHONY: build build-gui test run clean pack lint
 
-APP_NAME := offline-launcher
+APP_NAME := go-launcher
 BUILD_DIR := build
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags="-s -w -X main.version=$(VERSION)"
@@ -10,9 +10,13 @@ build:
 	@echo "Building $(APP_NAME) v$(VERSION)..."
 	go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)$(shell go env GOEXE) ./cmd/launcher
 
+build-gui:
+	@echo "Building $(APP_NAME) v$(VERSION) (hidden console)..."
+	go build $(GOFLAGS) $(LDFLAGS) -ldflags="-s -w -H windowsgui -X main.version=$(VERSION)" -o $(BUILD_DIR)/$(APP_NAME).exe ./cmd/launcher
+
 build-all:
 	@echo "Cross-compiling..."
-	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./cmd/launcher
+	GOOS=windows GOARCH=amd64 go build $(GOFLAGS) $(LDFLAGS) -ldflags="-s -w -H windowsgui -X main.version=$(VERSION)" -o $(BUILD_DIR)/$(APP_NAME)-windows-amd64.exe ./cmd/launcher
 	GOOS=linux GOARCH=amd64 go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./cmd/launcher
 	GOOS=darwin GOARCH=amd64 go build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-amd64 ./cmd/launcher
 

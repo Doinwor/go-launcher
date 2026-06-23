@@ -1,6 +1,6 @@
 version: 2
 
-project_name: offline-launcher
+project_name: go-launcher
 
 before:
   hooks:
@@ -9,10 +9,7 @@ before:
 builds:
   - id: launcher
     main: ./cmd/launcher
-    binary: launcher
-    ldflags:
-      - -s -w
-      - -X main.version={{ .Version }}
+    binary: go-launcher
     env:
       - CGO_ENABLED=0
     goos:
@@ -27,6 +24,20 @@ builds:
         goarch: arm64
       - goos: windows
         goarch: arm64
+    overrides:
+      - goos: windows
+        ldflags:
+          - -s -w
+          - -H windowsgui
+          - -X main.version={{ .Version }}
+      - goos: linux
+        ldflags:
+          - -s -w
+          - -X main.version={{ .Version }}
+      - goos: darwin
+        ldflags:
+          - -s -w
+          - -X main.version={{ .Version }}
 
 archives:
   - id: release
