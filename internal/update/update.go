@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const CurrentVersion = "1.0.0"
+var CurrentVersion = "1.0.0"
 
 const GitHubReleasesURL = "https://api.github.com/repos/Doinwor/go-launcher/releases/latest"
 
@@ -168,7 +168,7 @@ func Apply(manifestURL string, appDir string) error {
 	status.mu.Lock()
 	status.downloading = true
 	status.progress = 0
-	status.message = "Загрузка манифеста..."
+	status.message = "Р—Р°РіСЂСѓР·РєР° РјР°РЅРёС„РµСЃС‚Р°..."
 	status.done = false
 	status.err = ""
 	status.mu.Unlock()
@@ -202,21 +202,21 @@ func Apply(manifestURL string, appDir string) error {
 		return fmt.Errorf("parse manifest: %w", err)
 	}
 
-	setProgress(0.1, fmt.Sprintf("Новая версия: %s", manifest.Version))
+	setProgress(0.1, fmt.Sprintf("РќРѕРІР°СЏ РІРµСЂСЃРёСЏ: %s", manifest.Version))
 
 	tmpDir := filepath.Join(os.TempDir(), "offline-launcher-update")
 	os.RemoveAll(tmpDir)
 	os.MkdirAll(tmpDir, 0755)
 
 	zipPath := filepath.Join(tmpDir, "update.zip")
-	setProgress(0.15, "Скачивание обновления...")
+	setProgress(0.15, "РЎРєР°С‡РёРІР°РЅРёРµ РѕР±РЅРѕРІР»РµРЅРёСЏ...")
 
 	if err := downloadFile(zipPath, manifest.DownloadURL); err != nil {
 		setError(fmt.Sprintf("download: %v", err))
 		return fmt.Errorf("download: %w", err)
 	}
 
-	setProgress(0.6, "Проверка целостности...")
+	setProgress(0.6, "РџСЂРѕРІРµСЂРєР° С†РµР»РѕСЃС‚РЅРѕСЃС‚Рё...")
 
 	if manifest.SHA256 != "" {
 		if err := verifySHA256(zipPath, manifest.SHA256); err != nil {
@@ -225,7 +225,7 @@ func Apply(manifestURL string, appDir string) error {
 		}
 	}
 
-	setProgress(0.7, "Распаковка...")
+	setProgress(0.7, "Р Р°СЃРїР°РєРѕРІРєР°...")
 
 	extractDir := filepath.Join(tmpDir, "extracted")
 	if err := extractZip(zipPath, extractDir); err != nil {
@@ -233,14 +233,14 @@ func Apply(manifestURL string, appDir string) error {
 		return fmt.Errorf("extract: %w", err)
 	}
 
-	setProgress(0.85, "Установка...")
+	setProgress(0.85, "РЈСЃС‚Р°РЅРѕРІРєР°...")
 
 	if err := applyUpdate(extractDir, appDir); err != nil {
 		setError(fmt.Sprintf("apply: %v", err))
 		return err
 	}
 
-	setProgress(1.0, "Готово. Перезапуск...")
+	setProgress(1.0, "Р“РѕС‚РѕРІРѕ. РџРµСЂРµР·Р°РїСѓСЃРє...")
 
 	status.mu.Lock()
 	status.done = true
@@ -393,7 +393,7 @@ func downloadFile(destPath, url string) error {
 			}
 			written += int64(n)
 			if total > 0 {
-				setProgress(0.15+0.45*(float64(written)/float64(total)), "Скачивание обновления...")
+				setProgress(0.15+0.45*(float64(written)/float64(total)), "РЎРєР°С‡РёРІР°РЅРёРµ РѕР±РЅРѕРІР»РµРЅРёСЏ...")
 			}
 		}
 		if err == io.EOF {
