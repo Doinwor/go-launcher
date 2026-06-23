@@ -1,0 +1,10 @@
+[
+  {
+    "id": 1,
+    "title": "Go Launcher 1.0.0",
+    "date": "2026-06-23",
+    "body": "Первый стабильный релиз Go Launcher. Автообновления, офлайн-вход, установка Forge/Fabric/Quilt, моды с Modrinth и CurseForge.",
+    "important": true,
+    "url": "https://github.com/Doinwor/go-launcher/releases/tag/v1.0.0"
+  }
+]
