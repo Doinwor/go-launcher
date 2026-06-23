@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
@@ -99,6 +100,33 @@ func (m *Manager) ClearActive() error {
 
 	m.active = ""
 	return m.save()
+}
+
+func (m *Manager) RenameAccount(uuid, newNickname string) (*Account, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	acc, exists := m.accounts[uuid]
+	if !exists {
+		return nil, fmt.Errorf("account not found")
+	}
+
+	newNickname = strings.TrimSpace(newNickname)
+	if newNickname == "" {
+		return nil, fmt.Errorf("nickname cannot be empty")
+	}
+	if len(newNickname) > 16 {
+		return nil, fmt.Errorf("nickname too long (max 16 characters)")
+	}
+
+	acc.Username = newNickname
+	acc.LastUsed = time.Now().UTC().Format(time.RFC3339)
+
+	if err := m.save(); err != nil {
+		return nil, fmt.Errorf("failed to persist accounts: %w", err)
+	}
+
+	return acc, nil
 }
 
 func (m *Manager) RemoveAccount(uuid string) error {

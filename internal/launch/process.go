@@ -10,17 +10,21 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
 type ProcessManager struct {
-	mu       sync.RWMutex
-	cmd      *exec.Cmd
-	cancel   chan struct{}
-	logs     []LogEntry
-	logMu    sync.RWMutex
-	listeners map[chan LogEntry]struct{}
-	listenMu sync.RWMutex
+	mu              sync.RWMutex
+	cmd             *exec.Cmd
+	cancel          chan struct{}
+	logs            []LogEntry
+	logMu           sync.RWMutex
+	listeners        map[chan LogEntry]struct{}
+	listenMu        sync.RWMutex
+	exitCode        int
+	exitError       string
+	manuallyStopped bool
 }
 
 func NewProcessManager() *ProcessManager {
@@ -39,9 +43,25 @@ func (pm *ProcessManager) Start(javaPath string, args []string, workDir string) 
 	}
 
 	pm.cancel = make(chan struct{})
+	pm.exitCode = 0
+	pm.exitError = ""
+	pm.manuallyStopped = false
 
-	pm.cmd = exec.Command(javaPath, args[1:]...)
+	exePath := javaPath
+	procAttr := &syscall.SysProcAttr{}
+	if runtime.GOOS == "windows" {
+		// Use javaw.exe on Windows to avoid console window (GUI subsystem instead of console)
+		if strings.HasSuffix(javaPath, "java.exe") {
+			javawPath := strings.TrimSuffix(javaPath, "java.exe") + "javaw.exe"
+			if _, err := os.Stat(javawPath); err == nil {
+				exePath = javawPath
+			}
+		}
+		procAttr.HideWindow = true
+	}
+	pm.cmd = exec.Command(exePath, args[1:]...)
 	pm.cmd.Dir = workDir
+	pm.cmd.SysProcAttr = procAttr
 
 	stdout, err := pm.cmd.StdoutPipe()
 	if err != nil {
@@ -112,7 +132,37 @@ func (pm *ProcessManager) waitAndCleanup() {
 		return
 	}
 
-	cmd.Wait()
+	waitErr := cmd.Wait()
+
+	pm.mu.Lock()
+	if waitErr != nil {
+		if exitErr, ok := waitErr.(*exec.ExitError); ok {
+			pm.exitCode = exitErr.ExitCode()
+		} else {
+			pm.exitError = waitErr.Error()
+		}
+		entry := LogEntry{
+			Line: fmt.Sprintf("Minecraft exited with code %d", pm.exitCode),
+			Type: "system",
+		}
+		if pm.exitError != "" {
+			entry.Line += ": " + pm.exitError
+		}
+		entry.Time = time.Now().UnixMilli()
+		pm.logs = append(pm.logs, entry)
+		if len(pm.logs) > 10000 {
+			pm.logs = pm.logs[len(pm.logs)-5000:]
+		}
+		pm.listenMu.RLock()
+		for ch := range pm.listeners {
+			select {
+			case ch <- entry:
+			default:
+			}
+		}
+		pm.listenMu.RUnlock()
+	}
+	pm.mu.Unlock()
 
 	pm.listenMu.RLock()
 	for ch := range pm.listeners {
@@ -136,6 +186,8 @@ func (pm *ProcessManager) Stop() error {
 		return nil
 	}
 
+	pm.manuallyStopped = true
+
 	if err := killProcess(pid); err != nil {
 		return fmt.Errorf("kill process %d: %w", pid, err)
 	}
@@ -154,10 +206,16 @@ func (pm *ProcessManager) Status() ProcessStatus {
 	}
 
 	running := isProcessRunning(pm.cmd.Process.Pid)
-	return ProcessStatus{
-		Running: running,
-		PID:     pm.cmd.Process.Pid,
+	status := ProcessStatus{
+		Running:         running,
+		PID:             pm.cmd.Process.Pid,
+		ManuallyStopped: pm.manuallyStopped,
 	}
+	if !running {
+		status.ExitCode = pm.exitCode
+		status.ExitError = pm.exitError
+	}
+	return status
 }
 
 func (pm *ProcessManager) Subscribe() chan LogEntry {
@@ -188,6 +246,7 @@ func (pm *ProcessManager) GetLogs(limit int) []LogEntry {
 func isProcessRunning(pid int) bool {
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("tasklist", "/NH", "/FI", fmt.Sprintf("PID eq %d", pid))
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 		out, err := cmd.Output()
 		if err != nil {
 			return false
@@ -207,6 +266,7 @@ func isProcessRunning(pid int) bool {
 func killProcess(pid int) error {
 	if runtime.GOOS == "windows" {
 		cmd := exec.Command("taskkill", "/F", "/T", "/PID", fmt.Sprintf("%d", pid))
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 		return cmd.Run()
 	}
 	process, err := os.FindProcess(pid)

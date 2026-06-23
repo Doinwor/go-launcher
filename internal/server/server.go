@@ -53,6 +53,11 @@ type API struct {
 	cancelFuncs         map[string]context.CancelFunc
 	checkConnectivityFn func() bool
 	ShutdownCh          chan struct{}
+
+	updateMu     sync.RWMutex
+	updateResult *update.CheckResult
+	updateCachedAt time.Time
+
 }
 
 func New(authMgr *auth.Manager, profileStore *profiles.Store, settingsMgr *settings.Manager, launchCfg *launch.LaunchConfig) *API {
@@ -62,6 +67,15 @@ func New(authMgr *auth.Manager, profileStore *profiles.Store, settingsMgr *setti
 
 	as := authserver.New(25566)
 	as.SetSkinsDir(sm.SkinsDir())
+
+	// Clean up old account profiles ("offline" type)
+	profileStore.Load()
+	for id, p := range profileStore.GetProfiles() {
+		if p.Type == "offline" {
+			profileStore.DeleteProfile(id)
+		}
+	}
+	profileStore.Save()
 
 	s := settingsMgr.Get()
 	if s.MinecraftDir != "" {
@@ -125,6 +139,7 @@ func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/offline/login", a.handleAuthOfflineLogin)
+			authGroup.POST("/rename", a.handleAuthRename)
 			authGroup.GET("/active", a.handleAuthActive)
 			authGroup.GET("/list", a.handleAuthList)
 			authGroup.POST("/switch", a.handleAuthSwitch)
@@ -214,6 +229,7 @@ func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 			versionsGroup.POST("/cancel/:versionId", a.handleCancelInstall)
 			versionsGroup.DELETE("/:versionId", a.handleDeleteVersion)
 		}
+
 	}
 
 	r.Static("/skin", a.skinMgr.SkinsDir())
@@ -293,19 +309,33 @@ func (a *API) handleAuthOfflineLogin(c *gin.Context) {
 		return
 	}
 
-	p := profiles.Profile{
-		ID:       acc.UUID,
-		Name:     acc.Username,
-		Type:     "offline",
-		Created:  acc.CreatedAt,
-		LastUsed: acc.LastUsed,
-		Icon:     "stone_axe",
-	}
-	a.profileStore.UpsertProfile(p)
-	a.profileStore.SetSelectedProfile(acc.UUID)
-	a.profileStore.Save()
-
 	c.JSON(http.StatusOK, acc)
+}
+
+type renameReq struct {
+	Username string `json:"username" binding:"required"`
+}
+
+func (a *API) handleAuthRename(c *gin.Context) {
+	var req renameReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username is required"})
+		return
+	}
+
+	acc := a.authMgr.GetActiveAccount()
+	if acc == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "нет активного аккаунта"})
+		return
+	}
+
+	updated, err := a.authMgr.RenameAccount(acc.UUID, req.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updated)
 }
 
 func (a *API) handleAuthActive(c *gin.Context) {
@@ -407,8 +437,15 @@ func (a *API) handleAuthLogout(c *gin.Context) {
 
 func (a *API) handleGetProfiles(c *gin.Context) {
 	a.profileStore.Load()
-	profiles := a.profileStore.GetProfiles()
-	c.JSON(http.StatusOK, profiles)
+	allProfiles := a.profileStore.GetProfiles()
+	// Filter out account profiles (type "offline")
+	filtered := make(map[string]profiles.Profile)
+	for id, p := range allProfiles {
+		if p.Type != "offline" {
+			filtered[id] = p
+		}
+	}
+	c.JSON(http.StatusOK, filtered)
 }
 
 func (a *API) handleGetProfile(c *gin.Context) {
@@ -623,6 +660,10 @@ func (a *API) handleLaunchStop(c *gin.Context) {
 
 func (a *API) handleLaunchStatus(c *gin.Context) {
 	status := a.procMgr.Status()
+	if !status.Running && status.ExitCode != 0 && !status.ManuallyStopped {
+		logs := a.procMgr.GetLogs(500)
+		status.CrashAdvice = launch.AnalyzeCrash(status.ExitCode, logs)
+	}
 	c.JSON(http.StatusOK, status)
 }
 
@@ -730,14 +771,46 @@ func (a *API) handleAuthlibDownload(c *gin.Context) {
 
 type versionedSettings struct {
 	settings.AppSettings
-	LauncherVersion string `json:"launcherVersion"`
+	LauncherVersion      string `json:"launcherVersion"`
+	UpdateAvailable      bool   `json:"updateAvailable"`
+	UpdateLatestVersion  string `json:"updateLatestVersion"`
+}
+
+func (a *API) cachedUpdateCheck() (bool, string) {
+	a.updateMu.RLock()
+	if a.updateResult != nil && time.Since(a.updateCachedAt) < 5*time.Minute {
+		r := a.updateResult
+		a.updateMu.RUnlock()
+		return r.HasUpdate, r.Latest
+	}
+	a.updateMu.RUnlock()
+
+	a.updateMu.Lock()
+	defer a.updateMu.Unlock()
+
+	// Double-check after acquiring write lock
+	if a.updateResult != nil && time.Since(a.updateCachedAt) < 5*time.Minute {
+		return a.updateResult.HasUpdate, a.updateResult.Latest
+	}
+
+	result, err := update.CheckGitHub()
+	if err != nil {
+		log.L().Warn("update check failed", "error", err)
+		return false, ""
+	}
+	a.updateResult = result
+	a.updateCachedAt = time.Now()
+	return result.HasUpdate, result.Latest
 }
 
 func (a *API) handleGetSettings(c *gin.Context) {
 	s := a.settingsMgr.Get()
+	hasUpdate, latestVer := a.cachedUpdateCheck()
 	c.JSON(http.StatusOK, versionedSettings{
-		AppSettings:     *s,
-		LauncherVersion: update.CurrentVersion,
+		AppSettings:          *s,
+		LauncherVersion:      update.CurrentVersion,
+		UpdateAvailable:      hasUpdate,
+		UpdateLatestVersion:  latestVer,
 	})
 }
 

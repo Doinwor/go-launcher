@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-var CurrentVersion = "1.0.0"
+var CurrentVersion = "1.0.8"
 
 const GitHubReleasesURL = "https://api.github.com/repos/Doinwor/go-launcher/releases/latest"
 
@@ -63,37 +63,35 @@ func Status() map[string]interface{} {
 }
 
 func CheckGitHub() (*CheckResult, error) {
+	result, err := checkGitHubAPI()
+	if err == nil {
+		return result, nil
+	}
+	// Fallback: try gh-pages version.json
+	fallback, fbErr := checkVersionJSON()
+	if fbErr == nil {
+		return fallback, nil
+	}
+	return nil, err
+}
+
+func checkGitHubAPI() (*CheckResult, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", GitHubReleasesURL, nil)
 	if err != nil {
-		return &CheckResult{
-			HasUpdate: false,
-			Current:   CurrentVersion,
-			Latest:    CurrentVersion,
-			Error:     fmt.Sprintf("request failed: %v", err),
-		}, nil
+		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", "go-launcher/"+CurrentVersion)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return &CheckResult{
-			HasUpdate: false,
-			Current:   CurrentVersion,
-			Latest:    CurrentVersion,
-			Error:     fmt.Sprintf("GitHub unreachable: %v", err),
-		}, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return &CheckResult{
-			HasUpdate: false,
-			Current:   CurrentVersion,
-			Latest:    CurrentVersion,
-			Error:     fmt.Sprintf("GitHub HTTP %d", resp.StatusCode),
-		}, nil
+		return nil, fmt.Errorf("GitHub HTTP %d", resp.StatusCode)
 	}
 
 	var release struct {
@@ -117,6 +115,43 @@ func CheckGitHub() (*CheckResult, error) {
 	}
 
 	return result, nil
+}
+
+var versionJSONURLs = []string{
+	"https://doinwor.github.io/go-launcher/version.json",
+}
+
+func checkVersionJSON() (*CheckResult, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	for _, url := range versionJSONURLs {
+		resp, err := client.Get(url)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			continue
+		}
+
+		var v struct {
+			Latest string `json:"latest"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
+			continue
+		}
+		if v.Latest == "" {
+			continue
+		}
+
+		hasUpdate := compareVersions(v.Latest, CurrentVersion) > 0
+		return &CheckResult{
+			HasUpdate: hasUpdate,
+			Current:   CurrentVersion,
+			Latest:    v.Latest,
+		}, nil
+	}
+	return nil, fmt.Errorf("no version.json reachable")
 }
 
 func Check(manifestURL string) (*CheckResult, error) {
