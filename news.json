@@ -1,10 +1,24 @@
 [
   {
-    "id": 1,
+    "id": 3,
     "title": "Go Launcher 1.0.0",
     "date": "2026-06-23",
-    "body": "Первый стабильный релиз Go Launcher. Автообновления, офлайн-вход, установка Forge/Fabric/Quilt, моды с Modrinth и CurseForge.",
+    "body": "Первый стабильный релиз! Автообновления, офлайн-вход, установка Forge/Fabric/Quilt, моды с Modrinth и CurseForge.",
     "important": true,
     "url": "https://github.com/Doinwor/go-launcher/releases/tag/v1.0.0"
+  },
+  {
+    "id": 2,
+    "title": "Вышла Minecraft 1.21.5",
+    "date": "2026-06-15",
+    "body": "Mojang выпустили обновление с новыми блоками и исправлениями багов. Теперь доступна для установки через лаунчер.",
+    "important": false
+  },
+  {
+    "id": 1,
+    "title": "Запуск проекта",
+    "date": "2026-05-01",
+    "body": "Начата работа над Go Launcher — офлайн-лаунчером для Minecraft с поддержкой модов и скинов.",
+    "important": false
   }
 ]
