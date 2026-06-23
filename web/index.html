@@ -1,0 +1,2675 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>go launcher</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== CSS Variables ===== */
+:root {
+  --bg-primary: #0f0f11;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #222226;
+  --bg-card: #1a1a1e;
+  --bg-hover: #2a2a30;
+  --bg-active: #2d2d35;
+  --text: #e8e8ed;
+  --text-secondary: #a0a0aa;
+  --text-muted: #60606a;
+  --accent: #5be37b;
+  --accent-hover: #4ad06a;
+  --accent-gradient: linear-gradient(135deg, #2ecc71, #5be37b, #7bed9f);
+  --accent-glow: rgba(91, 227, 123, 0.25);
+  --accent-subtle: rgba(91, 227, 123, 0.08);
+  --orange: #f39c12;
+  --red: #e74c3c;
+  --red-glow: rgba(231, 76, 60, 0.25);
+  --blue: #5dade2;
+  --purple: #a569bd;
+  --border: #2a2a30;
+  --border-light: #3a3a44;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+  --shadow: 0 4px 16px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --font: 'Unbounded', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  --sidebar-width: 260px;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3a44; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #777; }
+
+/* ===== Layout ===== */
+#app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ===== Sidebar ===== */
+#sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  z-index: 100;
+  transition: transform var(--transition);
+}
+
+#sidebar.hidden { transform: translateX(-100%); }
+
+.sidebar-logo {
+  padding: 22px 18px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-logo .logo-icon {
+  width: 42px; height: 42px;
+  background: var(--accent-gradient);
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.sidebar-logo .logo-text {
+  font-size: 20px; font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.3px;
+}
+
+.sidebar-logo .logo-text span { color: var(--accent); }
+
+/* Profile list */
+#profile-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  margin-bottom: 2px;
+  position: relative;
+}
+
+.profile-item:hover {
+  background: var(--bg-hover);
+  transform: translateX(2px);
+}
+
+.profile-item.active {
+  background: var(--accent-subtle);
+}
+
+.profile-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 20px;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.profile-item .profile-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; color: #fff;
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+}
+
+.profile-item .profile-icon.loader-forge { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.profile-item .profile-icon.loader-fabric { background: linear-gradient(135deg, #f0b429 0%, #d4940a 50%, #b87a08 100%); }
+.profile-item .profile-icon.loader-quilt { background: linear-gradient(135deg, #af7ac5, #8e44ad); }
+.profile-item .profile-icon.loader-vanilla { background: linear-gradient(135deg, #5be37b, #2ecc71); }
+
+.profile-item .profile-info { flex: 1; min-width: 0; }
+.profile-item .profile-name {
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-item .profile-loader {
+  font-size: 11px; color: var(--text-muted);
+}
+.profile-item .profile-check {
+  color: var(--accent);
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+.profile-item.active .profile-check { opacity: 1; }
+
+/* Sidebar footer (account) */
+.sidebar-account {
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.sidebar-account:hover { background: rgba(255,255,255,0.03); }
+
+.sidebar-account .avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--accent-gradient);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+.sidebar-account .acc-info { flex: 1; min-width: 0; }
+.sidebar-account .acc-name {
+  font-size: 13px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-account .acc-type {
+  font-size: 11px; color: var(--text-muted);
+}
+.sidebar-account .acc-actions {
+  display: flex; gap: 4px;
+}
+.sidebar-account .acc-actions button {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 16px; padding: 5px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.sidebar-account .acc-actions button:hover {
+  color: var(--text); background: var(--bg-hover);
+}
+.sidebar-account .acc-actions #btn-logout {
+  color: var(--text-muted);
+}
+.sidebar-account .acc-actions #btn-logout:hover {
+  color: #fff;
+  background: var(--red);
+  box-shadow: 0 0 16px var(--red-glow);
+}
+
+/* Hamburger */
+#menu-toggle {
+  display: none;
+  position: fixed;
+  top: 12px; left: 12px;
+  z-index: 200;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text);
+  width: 40px; height: 40px;
+  border-radius: var(--radius);
+  font-size: 20px;
+  cursor: pointer;
+  align-items: center; justify-content: center;
+}
+
+/* ===== Main Content ===== */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0%, #1a1a22, var(--bg-primary) 70%);
+}
+
+/* Top Bar */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.top-bar .breadcrumb {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.top-bar .breadcrumb span { color: var(--text); font-weight: 600; }
+
+/* Hero / Version Info */
+#hero {
+  padding: 32px 32px 24px;
+  text-align: center;
+}
+
+#hero .version-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 14px;
+}
+
+#hero .version-badge.release { background: var(--accent-subtle); color: var(--accent); }
+#hero .version-badge.snapshot { background: rgba(243,156,18,0.12); color: var(--orange); }
+#hero .version-badge.old_beta,
+#hero .version-badge.old_alpha { background: rgba(255,255,255,0.05); color: #888; }
+
+#hero .version-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+#hero .version-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+/* Play Button */
+.play-section {
+  text-align: center;
+  padding: 0 32px 28px;
+}
+
+.btn-play {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 52px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: 40px;
+  cursor: pointer;
+  transition: all var(--transition);
+  box-shadow: 0 4px 20px var(--accent-glow);
+  letter-spacing: 0.3px;
+  min-width: 200px;
+}
+
+.btn-play::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 42px;
+  background: var(--accent-gradient);
+  opacity: 0;
+  filter: blur(12px);
+  transition: opacity var(--transition);
+  z-index: -1;
+}
+
+.btn-play:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 32px var(--accent-glow);
+}
+
+.btn-play:hover::before { opacity: 0.5; }
+
+.btn-play:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.btn-play:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-play:disabled::before { display: none; }
+
+.btn-play .play-icon { font-size: 22px; }
+
+.btn-play.btn-stop {
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+  box-shadow: 0 4px 20px var(--red-glow);
+}
+
+.btn-play.btn-stop::before {
+  background: linear-gradient(135deg, #c0392b, #e74c3c);
+}
+
+.btn-play.btn-stop:hover {
+  box-shadow: 0 8px 32px var(--red-glow);
+}
+
+.play-status {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.play-status .spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid var(--text-muted);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes progressPulse { 0% { opacity:0.6 } 50% { opacity:1 } 100% { opacity:0.6 } }
+
+/* ===== Tabs ===== */
+.tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  background: rgba(24, 24, 27, 0.4);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  padding: 13px 22px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  letter-spacing: 0.3px;
+  position: relative;
+}
+
+.tab-btn:hover { color: var(--text); }
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Tab Content */
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ===== Cards ===== */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: all var(--transition);
+}
+
+.card:hover {
+  border-color: var(--border-light);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: var(--font);
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f0f11;
+  font-weight: 600;
+}
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btn-danger {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.btn-danger:hover { background: #c0392b; border-color: #c0392b; }
+
+.btn-shutdown {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--red);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-shutdown:hover {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 0 12px var(--red-glow);
+  border-color: var(--red);
+}
+
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-icon { padding: 7px; min-width: 34px; min-height: 34px; }
+
+/* ===== Form Elements ===== */
+input, select, textarea {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  transition: all var(--transition);
+  width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  height: 6px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: -6px;
+  border: 2px solid var(--bg-primary);
+  box-shadow: 0 0 6px var(--accent-glow);
+  transition: transform var(--transition);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 2px solid var(--border-light);
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  transition: all var(--transition);
+  position: relative;
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+input[type="checkbox"]:checked::after {
+  content: '\2713';
+  color: #0f0f11;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Toggle switch */
+.toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle input { display: none; }
+
+.toggle .slider {
+  width: 38px; height: 22px;
+  background: var(--border);
+  border-radius: 11px;
+  transition: all var(--transition);
+  position: relative;
+}
+
+.toggle .slider::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  background: var(--text);
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+
+.toggle input:checked + .slider {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.toggle input:checked + .slider::after {
+  transform: translateX(16px);
+  background: #0f0f11;
+}
+
+/* ===== Version Grid ===== */
+.version-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.version-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.version-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 20px var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+.version-card .v-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.version-card .v-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.version-card .v-type-badge {
+  font-size: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.version-card .v-type-badge.release { background: var(--accent-subtle); color: var(--accent); }
+.version-card .v-type-badge.snapshot { background: rgba(243,156,18,0.12); color: var(--orange); }
+.version-card .v-type-badge.old_beta,
+.version-card .v-type-badge.old_alpha { background: rgba(255,255,255,0.06); color: #888; }
+
+.version-card .v-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.version-card .v-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+/* ===== Mods ===== */
+.loader-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.loader-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.loader-card:hover {
+  border-color: var(--border-light);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.2);
+}
+
+.loader-card .loader-icon {
+  width: 52px; height: 52px;
+  border-radius: var(--radius);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: #fff;
+  margin: 0 auto 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.loader-card .loader-icon.forge { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.loader-card .loader-icon.fabric { background: linear-gradient(135deg, #f0b429 0%, #d4940a 50%, #b87a08 100%); }
+.loader-card .loader-icon.quilt { background: linear-gradient(135deg, #af7ac5, #8e44ad); }
+
+.loader-card .loader-name {
+  font-size: 16px; font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.loader-card .loader-status {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.loader-card .loader-status.installed { color: var(--accent); }
+.loader-card .loader-status.not-installed { color: var(--text-muted); }
+.loader-card .loader-versions {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  text-align: left;
+}
+.loader-card .loader-versions li {
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  border-left: 2px solid transparent;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.loader-card .loader-versions li:hover {
+  background: var(--bg-hover);
+  border-left-color: var(--accent);
+}
+.loader-card .loader-versions li i {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.loader-version-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.mod-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+  transition: all var(--transition);
+}
+
+.mod-item:hover {
+  border-color: var(--border-light);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+
+.mod-item .mod-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.mod-item .mod-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+.mod-item .mod-info { flex: 1; min-width: 0; }
+.mod-item .mod-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.mod-item .mod-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+.mod-item .mod-toggle {
+  flex-shrink: 0;
+}
+
+.mod-item .mod-delete {
+  flex-shrink: 0;
+  background: none; border: none;
+  color: var(--text-muted);
+  cursor: pointer; font-size: 16px;
+  padding: 5px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.mod-item .mod-delete:hover { color: var(--red); background: rgba(231,76,60,0.1); }
+
+.mod-profile-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.mod-profile-bar .mp-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.mod-profile-bar .mp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #0f0f11;
+  font-weight: 600;
+}
+.mod-item.in-profile {
+  border-left: 3px solid var(--accent);
+}
+
+/* ===== Search Results ===== */
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.search-result-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.search-result-item .sr-icon {
+  width: 48px; height: 48px;
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.search-result-item .sr-icon img { width: 100%; height: 100%; object-fit: cover; }
+
+.search-result-item .sr-info { flex: 1; min-width: 0; }
+.search-result-item .sr-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.search-result-item .sr-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.search-result-item .sr-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ===== Settings ===== */
+.settings-group {
+  margin-bottom: 28px;
+}
+
+.settings-group .group-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.settings-group .group-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.memory-sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.memory-slider-group label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.memory-slider-group .mem-value {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ===== Logs ===== */
+.log-container {
+  background: #0a0a0c;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  height: calc(100vh - 350px);
+  min-height: 300px;
+  overflow-y: auto;
+  padding: 14px;
+  position: relative;
+}
+
+.log-container .log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-container .log-line.log-stdout { color: #ccc; }
+.log-container .log-line.log-stderr { color: #ef5350; }
+.log-container .log-line.log-system { color: var(--accent); }
+.log-container .log-line.log-info { color: var(--blue); }
+.log-container .log-line.log-warn { color: var(--orange); }
+.log-container .log-line.log-error { color: var(--red); font-weight: 600; }
+
+.log-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ===== Modals ===== */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  animation: modalIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.92) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modal-header .modal-close {
+  background: none; border: none;
+  color: var(--text-muted);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+.modal-header .modal-close:hover { color: var(--text); background: var(--bg-hover); }
+
+.modal-body {
+  padding: 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--border);
+}
+
+/* Progress bar */
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-bar .progress-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== Toast ===== */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  padding: 14px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  animation: slideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 280px;
+  max-width: 400px;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.toast.success { border-left: 3px solid var(--accent); }
+.toast.error { border-left: 3px solid var(--red); }
+.toast.info { border-left: 3px solid var(--blue); }
+
+.toast .toast-icon { font-size: 18px; }
+.toast.success .toast-icon { color: var(--accent); }
+.toast.error .toast-icon { color: var(--red); }
+.toast.info .toast-icon { color: var(--blue); }
+
+/* ===== Spinner ===== */
+.spinner-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.spinner-lg {
+  width: 36px; height: 36px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ===== Empty state ===== */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-state .empty-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.empty-state .empty-desc {
+  font-size: 13px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  #sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100%;
+    transform: translateX(-100%);
+  }
+  #sidebar.open { transform: translateX(0); }
+  #menu-toggle { display: flex; }
+  .top-bar { padding-left: 60px; }
+}
+
+@media (max-width: 480px) {
+  :root { --sidebar-width: 240px; }
+  #hero .version-title { font-size: 24px; }
+  .form-row { grid-template-columns: 1fr; }
+  .memory-sliders { grid-template-columns: 1fr; }
+  .version-grid { grid-template-columns: 1fr; }
+  .loader-cards { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Hamburger -->
+  <button id="menu-toggle" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⛏</div>
+      <div class="logo-text">go<span>L</span></div>
+    </div>
+
+    <div id="profile-list"></div>
+
+    <div class="sidebar-account" id="sidebar-account">
+      <div class="avatar" id="acc-avatar">?</div>
+      <div class="acc-info">
+        <div class="acc-name" id="acc-name">Не в сети</div>
+        <div class="acc-type" id="acc-type">Нажмите для входа</div>
+      </div>
+      <div class="acc-actions">
+        <button onclick="showLoginModal()" title="Сменить аккаунт"><i class="bi bi-person-badge"></i></button>
+        <button onclick="logoutUser()" title="Выйти" id="btn-logout" style="display:none"><i class="bi bi-box-arrow-left"></i></button>
+      </div>
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px">
+      <button onclick="shutdownLauncher()" title="Закрыть лаунчер" class="btn-shutdown">
+        <i class="bi bi-power"></i>
+      </button>
+      <span style="font-size:11px;color:var(--text-muted);align-self:center">v1.0.0</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main id="main">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="breadcrumb"><i class="bi bi-grid-1x2-fill"></i> <span id="breadcrumb">Главная</span></div>
+    </div>
+
+    <!-- Hero -->
+    <div id="hero">
+      <div class="version-badge release" id="hero-badge">Release</div>
+      <div class="version-title" id="hero-title">Выберите версию</div>
+      <div class="version-subtitle" id="hero-sub">Щёлкните по профилю слева, чтобы начать</div>
+    </div>
+
+    <!-- Play Section -->
+    <div class="play-section">
+      <button class="btn-play" id="btn-play" onclick="handlePlay()" disabled>
+        <i class="bi bi-play-fill play-icon"></i> Играть
+      </button>
+      <div class="play-status" id="play-status">
+        <span>Выберите профиль для запуска</span>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="news" onclick="switchTab('news')"><i class="bi bi-newspaper"></i> Новости</button>
+      <button class="tab-btn" data-tab="versions" onclick="switchTab('versions')"><i class="bi bi-layers"></i> Версии</button>
+      <button class="tab-btn" data-tab="mods" onclick="switchTab('mods')"><i class="bi bi-puzzle"></i> Моды</button>
+      <button class="tab-btn" data-tab="settings" onclick="switchTab('settings')"><i class="bi bi-gear"></i> Настройки</button>
+      <button class="tab-btn" data-tab="logs" onclick="switchTab('logs'); initLogs();"><i class="bi bi-terminal"></i> Логи</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      <!-- News -->
+      <div class="tab-pane active" id="tab-news">
+        <div class="empty-state">
+          <div class="empty-icon">⛏</div>
+          <div class="empty-title">Добро пожаловать в go launcher</div>
+          <div class="empty-desc">Офлайн-лаунчер для Minecraft. Слева выберите профиль и нажмите «Играть».</div>
+          <div style="margin-top:16px;display:flex;justify-content:center;gap:8px">
+            <button class="btn btn-primary" onclick="switchTab('versions')"><i class="bi bi-layers"></i> Управление версиями</button>
+            <button class="btn" onclick="switchTab('mods')"><i class="bi bi-puzzle"></i> Моды</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Versions -->
+      <div class="tab-pane" id="tab-versions">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="font-size:16px;font-weight:600">Установленные версии</h3>
+          <button class="btn btn-primary" onclick="showInstallVersionModal()"><i class="bi bi-plus-lg"></i> Установить новую</button>
+        </div>
+        <div id="installed-versions" class="version-grid"></div>
+      </div>
+
+      <!-- Mods -->
+      <div class="tab-pane" id="tab-mods">
+        <h3 style="font-size:16px;font-weight:600;margin-bottom:12px">Загрузчики</h3>
+        <div class="loader-cards" id="loader-cards"></div>
+
+        <div class="mod-profile-bar" id="mod-profile-bar">
+          <span class="mp-label"><i class="bi bi-layers"></i> Профиль модов:</span>
+          <span id="mp-version-label" style="font-size:13px;font-weight:600;color:var(--text);flex:1">—</span>
+          <span id="mp-active-badge" class="mp-badge" style="display:none"><i class="bi bi-check2"></i> Активен</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0 12px">
+          <h3 style="font-size:16px;font-weight:600">Установленные моды</h3>
+          <button class="btn btn-primary" onclick="showModSearchModal()"><i class="bi bi-search"></i> Найти мод</button>
+        </div>
+        <div id="mod-list"></div>
+      </div>
+
+      <!-- Settings -->
+      <div class="tab-pane" id="tab-settings">
+        <div class="settings-group">
+          <div class="group-title">Память</div>
+          <div class="group-desc">Выделите объём оперативной памяти для Minecraft.</div>
+          <div class="memory-sliders">
+            <div class="memory-slider-group">
+              <label>Минимум (Xms) <span class="mem-value" id="mem-min-val">1024 MB</span></label>
+              <input type="range" id="mem-min" min="512" max="16384" step="256" value="1024" oninput="updateMemLabels()">
+            </div>
+            <div class="memory-slider-group">
+              <label>Максимум (Xmx) <span class="mem-value" id="mem-max-val">4096 MB</span></label>
+              <input type="range" id="mem-max" min="512" max="32768" step="256" value="4096" oninput="updateMemLabels()">
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-title">Пути</div>
+          <div class="form-group">
+            <label>Путь к Java</label>
+            <input type="text" id="set-java-path" placeholder="java (из PATH)">
+          </div>
+          <div class="form-group">
+            <label>Путь к .minecraft</label>
+            <input type="text" id="set-mc-dir" placeholder="%APPDATA%\.minecraft">
+          </div>
+          <button class="btn" onclick="openMinecraftFolder()"><i class="bi bi-folder2-open"></i> Открыть папку</button>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-title">Разрешение окна</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Ширина</label>
+              <input type="number" id="set-win-w" value="854" min="640" max="3840">
+            </div>
+            <div class="form-group">
+              <label>Высота</label>
+              <input type="number" id="set-win-h" value="480" min="480" max="2160">
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-title">Дополнительно</div>
+          <div class="form-group">
+            <label>CurseForge API Key</label>
+            <input type="password" id="set-cf-key" placeholder="Оставьте пустым, если не используется">
+          </div>
+          <div class="form-group">
+            <label>Язык</label>
+            <select id="set-lang">
+              <option value="ru-ru">Русский</option>
+              <option value="en-us">English</option>
+            </select>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+            <label class="toggle">
+              <input type="checkbox" id="set-auth-injector">
+              <span class="slider"></span>
+              Использовать Authlib-Injector
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="set-auth-server">
+              <span class="slider"></span>
+              Включить встроенный Auth Server
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="set-auto-update">
+              <span class="slider"></span>
+              Проверять обновления
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn btn-primary" onclick="saveSettings()"><i class="bi bi-check-lg"></i> Сохранить</button>
+          <button class="btn" onclick="loadSettings()"><i class="bi bi-arrow-counterclockwise"></i> Сбросить</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:13px;font-weight:600;color:var(--red);display:flex;align-items:center;gap:6px">
+            <i class="bi bi-exclamation-triangle-fill"></i> Завершение работы
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
+            Закрывает лаунчер полностью. Чтобы снова открыть, запустите offline-launcher.exe.
+          </div>
+          <button class="btn btn-danger" onclick="shutdownLauncher()" style="width:fit-content">
+            <i class="bi bi-power"></i> Закрыть лаунчер
+          </button>
+        </div>
+      </div>
+
+      <!-- Logs -->
+      <div class="tab-pane" id="tab-logs">
+        <div class="log-toolbar">
+          <button class="btn btn-sm" onclick="clearLogs()"><i class="bi bi-trash"></i> Очистить</button>
+          <button class="btn btn-sm" onclick="copyLogs()"><i class="bi bi-clipboard"></i> Копировать</button>
+        </div>
+        <div class="log-container" id="log-container"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== Modals ===== -->
+
+<!-- Login Modal -->
+<div class="modal-overlay" id="login-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Вход в аккаунт</h2>
+      <button class="modal-close" onclick="closeModal('login-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Игровой никнейм</label>
+        <input type="text" id="login-username" placeholder="Введите никнейм" maxlength="16" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('login-modal')">Отмена</button>
+      <button class="btn btn-primary" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> Войти</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install Version Modal -->
+<div class="modal-overlay" id="install-modal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <h2>Установка версии</h2>
+      <button class="modal-close" onclick="closeModal('install-modal'); cancelInstallVersion()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <input type="text" id="install-search" placeholder="Поиск версии..." oninput="filterManifest()">
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        <button class="btn btn-sm" data-filter="all" onclick="filterManifestType('all',this)">Все</button>
+        <button class="btn btn-sm" data-filter="release" onclick="filterManifestType('release',this)">Release</button>
+        <button class="btn btn-sm" data-filter="snapshot" onclick="filterManifestType('snapshot',this)">Snapshot</button>
+        <button class="btn btn-sm" data-filter="old_beta" onclick="filterManifestType('old_beta',this)">Beta</button>
+        <button class="btn btn-sm" data-filter="old_alpha" onclick="filterManifestType('old_alpha',this)">Alpha</button>
+      </div>
+      <div id="manifest-list" style="max-height:300px;overflow-y:auto"></div>
+      <div id="install-progress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="install-progress-fill"></div></div>
+        <div class="progress-text" id="install-progress-text">Установка...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('install-modal'); cancelInstallVersion()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install Loader Modal -->
+<div class="modal-overlay" id="loader-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Установка загрузчика</h2>
+      <button class="modal-close" onclick="closeModal('loader-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Загрузчик</label>
+        <select id="loader-type">
+          <option value="fabric">Fabric</option>
+          <option value="forge">Forge</option>
+          <option value="quilt">Quilt</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Версия Minecraft</label>
+        <select id="loader-mc"><option value="">Загрузка списка версий...</option></select>
+        <div style="margin-top:4px;font-size:12px;color:var(--text-muted)">Показаны только release-версии</div>
+      </div>
+      <div class="form-group">
+        <label>Версия загрузчика (оставьте пустой для последней)</label>
+        <input type="text" id="loader-ver" placeholder="Авто">
+      </div>
+      <label class="toggle" style="margin-top:8px">
+        <input type="checkbox" id="loader-fabric-api">
+        <span class="slider"></span>
+        Установить Fabric API
+      </label>
+      <div id="loader-progress" style="display:none;margin-top:12px">
+        <div class="progress-bar"><div class="progress-fill" id="loader-progress-fill" style="width:100%;animation:progressPulse 1.5s ease infinite"></div></div>
+        <div class="progress-text" id="loader-progress-text">Установка...</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('loader-modal')">Отмена</button>
+      <button class="btn btn-primary" onclick="installLoader()"><i class="bi bi-download"></i> Установить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mod Search Modal -->
+<div class="modal-overlay" id="modsearch-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <h2>Поиск модов</h2>
+      <button class="modal-close" onclick="closeModal('modsearch-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Источник</label>
+        <select id="modsearch-source">
+          <option value="modrinth">Modrinth</option>
+          <option value="curseforge">CurseForge</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="modsearch-query" placeholder="Название мода..." style="flex:1" onkeydown="if(event.key==='Enter') searchMods()">
+        <button class="btn btn-primary" onclick="searchMods()"><i class="bi bi-search"></i></button>
+      </div>
+      <div id="modsearch-results" style="margin-top:12px;max-height:350px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modsearch-modal')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2 id="confirm-title">Подтверждение</h2>
+      <button class="modal-close" onclick="closeModal('confirm-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-text" style="font-size:14px;color:var(--text-secondary)"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('confirm-modal')">Отмена</button>
+      <button class="btn btn-danger" id="confirm-btn" onclick="">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modprofile-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>Создать профиль модов</h2>
+      <button class="modal-close" onclick="closeModal('modprofile-modal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Название профиля</label>
+        <input type="text" id="modprofile-name" placeholder="Например: PvP, Оптимизация..." maxlength="40">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modprofile-modal')">Отмена</button>
+      <button class="btn btn-primary" onclick="createModProfile()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ==========================================================================
+ *  go launcher — MC Offline Launcher Frontend
+ *  Чистый JS, без фреймворков. Состояние в объекте state, UI через рендер.
+ * ========================================================================== */
+
+/* ===== State ===== */
+const state = {
+  profiles: {},                // { [id]: Profile } from /api/profiles
+  selectedProfileId: null,     // ID выбранного профиля
+  account: null,               // активный аккаунт { uuid, username, ... }
+  settings: null,              // настройки
+  installedVersions: [],       // [{ id, loader, modified }]
+  manifest: [],                // [{ id, type, url, time, releaseTime }]
+  manifestFilter: 'all',
+  manifestSearch: '',
+  mods: [],                    // [{ id, name, enabled, ... }]
+  modProfiles: [],             // [{ id, name, modIds }]
+  activeModProfileId: null,    // ID активного профиля модов
+  profileModIDs: [],           // modIds в активном профиле
+  gameRunning: false,
+  gamePid: null,
+  logs: [],                    // [{ line, type, time }]
+  logSource: null,             // EventSource
+  installVersionId: null,      // текущая устанавливаемая версия
+  installSource: null,         // EventSource для прогресса установки
+  loaderInstalling: false,
+};
+
+/* ===== API Helpers ===== */
+async function api(url, opts = {}) {
+  try {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json', ...opts.headers },
+      ...opts,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (e) {
+    if (e.message !== 'Failed to fetch') throw e;
+    throw new Error('Нет соединения с лаунчером');
+  }
+}
+
+function toast(msg, type = 'info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  const icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', info: 'bi-info-circle-fill' };
+  t.innerHTML = `<i class="bi ${icons[type]} toast-icon"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, type === 'error' ? 5000 : 3000);
+}
+
+function showModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+function confirmDialog(title, text, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-text').textContent = text;
+  document.getElementById('confirm-btn').onclick = async () => { closeModal('confirm-modal'); await cb(); };
+  showModal('confirm-modal');
+}
+
+/* ===== Sidebar ===== */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+/* ===== Profile Management ===== */
+async function loadProfiles() {
+  try {
+    const data = await api('/api/profiles');
+    state.profiles = data.profiles || data || {};
+    if (data.selectedProfile) {
+      state.selectedProfileId = data.selectedProfile;
+    } else if (Object.keys(state.profiles).length > 0) {
+      state.selectedProfileId = Object.keys(state.profiles)[0];
+    }
+  } catch (e) {
+    console.warn('loadProfiles:', e.message);
+  }
+  // Merge installed versions that aren't in profiles (e.g. Fabric/Forge loaders)
+  try {
+    const iv = await api('/api/versions/installed');
+    const installed = iv.versions || [];
+    for (const v of installed) {
+      if (!state.profiles[v.id]) {
+        state.profiles[v.id] = { id: v.id, name: v.id, type: 'custom', loader: v.loader || detectLoader(v.id) };
+      }
+    }
+  } catch (_) {}
+  // Select first if nothing selected
+  if (!state.selectedProfileId && Object.keys(state.profiles).length > 0) {
+    state.selectedProfileId = Object.keys(state.profiles)[0];
+  }
+  renderProfiles();
+  updateHero();
+}
+
+function renderProfiles() {
+  const list = document.getElementById('profile-list');
+  const ids = Object.keys(state.profiles);
+  if (ids.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state" style="padding:20px 8px">
+        <div class="empty-icon" style="font-size:32px"><i class="bi bi-box"></i></div>
+        <div class="empty-title" style="font-size:13px">Нет профилей</div>
+        <div class="empty-desc" style="font-size:11px">Установите версию</div>
+      </div>
+      <button class="btn btn-primary" style="width:calc(100% - 16px);margin:8px" onclick="showInstallVersionModal()">
+        <i class="bi bi-plus-lg"></i> Установить
+      </button>
+    `;
+    return;
+  }
+
+  let html = '';
+  for (const id of ids) {
+    const p = state.profiles[id];
+    const loader = p.loader || detectLoader(id);
+    const active = id === state.selectedProfileId ? 'active' : '';
+    const iconClass = loader === 'forge' ? 'loader-forge' : loader === 'fabric' ? 'loader-fabric' : loader === 'quilt' ? 'loader-quilt' : 'loader-vanilla';
+    const loaderLabel = loader === 'vanilla' ? 'Ванилла' : loader === 'forge' ? 'Forge' : loader === 'fabric' ? 'Fabric' : loader === 'quilt' ? 'Quilt' : 'Ванилла';
+    html += `
+      <div class="profile-item ${active}" onclick="selectProfile('${id}')">
+        <div class="profile-icon ${iconClass}">${loader === 'forge' ? '<i class="bi bi-fire"></i>' : loader === 'fabric' ? '<i class="bi bi-grid-3x3-gap-fill"></i>' : loader === 'quilt' ? '<i class="bi bi-palette"></i>' : '<i class="bi bi-controller"></i>'}</div>
+        <div class="profile-info">
+          <div class="profile-name">${escapeHtml(p.name || id)}</div>
+          <div class="profile-loader">${loaderLabel}</div>
+        </div>
+        <div class="profile-check"><i class="bi bi-check-circle-fill"></i></div>
+      </div>
+    `;
+  }
+  list.innerHTML = html;
+}
+
+function detectLoader(id) {
+  if (/^forge-/i.test(id)) return 'forge';
+  if (/^fabric/i.test(id)) return 'fabric';
+  if (/^quilt/i.test(id)) return 'quilt';
+  return 'vanilla';
+}
+
+async function selectProfile(id) {
+  state.selectedProfileId = id;
+  renderProfiles();
+  updateHero();
+  document.getElementById('btn-play').disabled = !state.account;
+  // Auto-activate mod profile for this version
+  if (id) {
+    try {
+      await api(`/api/mod-profiles/${encodeURIComponent(id)}/activate`, { method: 'POST' });
+      if (document.getElementById('tab-mods').classList.contains('active')) {
+        await loadModProfiles();
+        await loadMods();
+      }
+    } catch (e) {
+      // может не быть профиля модов — ок
+    }
+  }
+}
+
+function updateHero() {
+  const title = document.getElementById('hero-title');
+  const sub = document.getElementById('hero-sub');
+  const badge = document.getElementById('hero-badge');
+
+  if (!state.selectedProfileId || !state.profiles[state.selectedProfileId]) {
+    title.textContent = 'Выберите версию';
+    sub.textContent = 'Щёлкните по профилю слева, чтобы начать';
+    badge.textContent = 'Release';
+    badge.className = 'version-badge release';
+    return;
+  }
+
+  const p = state.profiles[state.selectedProfileId];
+  title.textContent = p.name || state.selectedProfileId;
+  const loader = detectLoader(state.selectedProfileId);
+  const type = loader === 'vanilla' ? 'release' : 'snapshot';
+  badge.textContent = loader === 'vanilla' ? 'Release' : loader.toUpperCase();
+  badge.className = `version-badge ${type}`;
+  sub.textContent = loader === 'vanilla' ? 'Официальная версия' : `Загрузчик: ${loader.charAt(0).toUpperCase() + loader.slice(1)}`;
+}
+
+/* ===== Account ===== */
+async function loadAccount() {
+  try {
+    const data = await api('/api/auth/active');
+    state.account = data.account;
+  } catch (e) {
+    state.account = null;
+  }
+  renderAccount();
+}
+
+function renderAccount() {
+  const avatar = document.getElementById('acc-avatar');
+  const name = document.getElementById('acc-name');
+  const type = document.getElementById('acc-type');
+  const logoutBtn = document.getElementById('btn-logout');
+
+  if (state.account) {
+    avatar.textContent = state.account.username.charAt(0).toUpperCase();
+    name.textContent = state.account.username;
+    type.textContent = 'В сети';
+    document.getElementById('btn-play').disabled = !state.selectedProfileId;
+    if (logoutBtn) logoutBtn.style.display = '';
+  } else {
+    avatar.textContent = '?';
+    name.textContent = 'Не в сети';
+    type.textContent = 'Нажмите для входа';
+    document.getElementById('btn-play').disabled = true;
+    if (logoutBtn) logoutBtn.style.display = 'none';
+  }
+}
+
+async function logoutUser() {
+  confirmDialog('Выход', 'Вы уверены, что хотите выйти из аккаунта?', async () => {
+    await api('/api/auth/logout', { method: 'POST' });
+    state.account = null;
+    renderAccount();
+    toast('Вы вышли из аккаунта', 'success');
+  });
+}
+
+function shutdownLauncher() {
+  confirmDialog('Завершение работы', 'Закрыть лаунчер полностью? Игру это не остановит.', async () => {
+    document.body.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:center;height:100vh;background:var(--bg-primary);color:var(--text-secondary);flex-direction:column;gap:16px">
+        <div style="font-size:48px"><i class="bi bi-power" style="color:var(--red)"></i></div>
+        <div style="font-size:18px;font-weight:500">Лаунчер завершает работу...</div>
+        <div style="font-size:13px">Чтобы снова открыть, запустите offline-launcher.exe</div>
+      </div>`;
+    try {
+      await api('/api/shutdown', { method: 'POST' });
+    } catch (_) {}
+  });
+}
+
+function showLoginModal() {
+  document.getElementById('login-username').value = state.account ? state.account.username : '';
+  showModal('login-modal');
+  setTimeout(() => document.getElementById('login-username').focus(), 100);
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  if (!username) return toast('Введите никнейм', 'error');
+  if (username.length > 16) return toast('Никнейм слишком длинный (макс. 16 символов)', 'error');
+
+  try {
+    await api('/api/auth/offline/login', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+    closeModal('login-modal');
+    toast('Вход выполнен!', 'success');
+    await loadAccount();
+    await loadProfiles();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+/* ===== Play ===== */
+let playStatusInterval = null;
+
+async function handlePlay() {
+  const btn = document.getElementById('btn-play');
+  const status = document.getElementById('play-status');
+
+  if (state.gameRunning) {
+    try {
+      await api('/api/launch/stop', { method: 'POST' });
+      toast('Игра остановлена', 'info');
+      state.gameRunning = false;
+      state.gamePid = null;
+      updatePlayButton();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+    return;
+  }
+
+  if (!state.selectedProfileId || !state.account) return;
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner"></span> Запуск...';
+
+  try {
+    const res = await api('/api/launch/start', {
+      method: 'POST',
+      body: JSON.stringify({ versionId: state.selectedProfileId }),
+    });
+    state.gameRunning = true;
+    state.gamePid = res.pid;
+    toast('Minecraft запущен!', 'success');
+    updatePlayButton();
+    // Poll status
+    if (playStatusInterval) clearInterval(playStatusInterval);
+    playStatusInterval = setInterval(pollGameStatus, 3000);
+    pollGameStatus();
+  } catch (e) {
+    status.innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    btn.disabled = false;
+    toast(e.message, 'error');
+  }
+}
+
+async function pollGameStatus() {
+  try {
+    const s = await api('/api/launch/status');
+    if (!s.running) {
+      state.gameRunning = false;
+      state.gamePid = null;
+      updatePlayButton();
+      if (playStatusInterval) { clearInterval(playStatusInterval); playStatusInterval = null; }
+      document.getElementById('play-status').innerHTML = '<span>Игра завершена</span>';
+    }
+  } catch (_) {}
+}
+
+function updatePlayButton() {
+  const btn = document.getElementById('btn-play');
+  const status = document.getElementById('play-status');
+
+  if (state.gameRunning) {
+    btn.innerHTML = '<i class="bi bi-stop-fill play-icon"></i> Остановить';
+    btn.className = 'btn-play btn-stop';
+    btn.disabled = false;
+    status.innerHTML = `Игра запущена ${state.gamePid ? '(PID: ' + state.gamePid + ')' : ''}`;
+  } else {
+    btn.innerHTML = '<i class="bi bi-play-fill play-icon"></i> Играть';
+    btn.className = 'btn-play';
+    btn.disabled = !state.account || !state.selectedProfileId;
+    status.innerHTML = state.account && state.selectedProfileId ? 'Готов к запуску' : 'Выберите профиль для запуска';
+  }
+}
+
+/* ===== Tabs ===== */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  document.getElementById('breadcrumb').textContent =
+    tab === 'news' ? 'Главная' :
+    tab === 'versions' ? 'Версии' :
+    tab === 'mods' ? 'Моды' :
+    tab === 'settings' ? 'Настройки' : 'Логи';
+
+  if (tab === 'versions') loadInstalledVersions();
+  if (tab === 'mods') { loadLoaders(); loadModProfiles(); loadMods(); }
+  if (tab === 'settings') loadSettings();
+}
+
+/* ===== Versions Tab ===== */
+async function loadInstalledVersions() {
+  const container = document.getElementById('installed-versions');
+  container.innerHTML = '<div class="spinner-wrap"><div class="spinner-lg"></div></div>';
+
+  try {
+    const data = await api('/api/versions/installed');
+    state.installedVersions = data.versions || [];
+  } catch (e) {
+    state.installedVersions = [];
+  }
+
+  if (state.installedVersions.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-icon"><i class="bi bi-box"></i></div>
+        <div class="empty-title">Нет установленных версий</div>
+        <div class="empty-desc">Нажмите «Установить новую», чтобы добавить версию</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = state.installedVersions.map(v => {
+    const loader = v.loader || detectLoader(v.id);
+    return `
+      <div class="version-card" onclick="selectProfile('${v.id}')">
+        <div class="v-top">
+          <div class="v-name">${escapeHtml(v.id)}</div>
+          <span class="v-type-badge ${loader === 'vanilla' ? 'release' : 'snapshot'}">${loader === 'vanilla' ? 'Release' : loader.toUpperCase()}</span>
+        </div>
+        <div class="v-meta">${new Date(v.modified * 1000).toLocaleDateString()}</div>
+        <div class="v-actions">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();selectProfile('${v.id}');switchTab('news')"><i class="bi bi-play-fill"></i></button>
+          <button class="btn btn-sm" onclick="event.stopPropagation();showInstallLoaderModal('${v.id}')"><i class="bi bi-puzzle"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();confirmDeleteVersion('${v.id}')"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function confirmDeleteVersion(id) {
+  confirmDialog('Удаление версии', `Удалить версию «${id}»? Эту операцию нельзя отменить.`, async () => {
+    await api(`/api/versions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    toast(`Версия «${id}» удалена`, 'success');
+    await loadInstalledVersions();
+  });
+}
+
+/* ===== Install Version Modal ===== */
+async function showInstallVersionModal() {
+  showModal('install-modal');
+  document.getElementById('install-progress').style.display = 'none';
+  const list = document.getElementById('manifest-list');
+  list.innerHTML = '<div class="spinner-wrap"><div class="spinner-lg"></div></div>';
+
+  try {
+    const data = await api('/api/versions');
+    state.manifest = data.versions || [];
+  } catch (e) {
+    // Try localStorage cache
+    const cached = localStorage.getItem('versionManifest');
+    if (cached) {
+      state.manifest = JSON.parse(cached);
+      toast('Используется кэшированный список версий', 'info');
+    } else {
+      list.innerHTML = '<div class="empty-state"><div class="empty-icon"><i class="bi bi-wifi-off"></i></div><div class="empty-title">Нет соединения</div><div class="empty-desc">Не удалось загрузить список версий</div></div>';
+      return;
+    }
+  }
+  localStorage.setItem('versionManifest', JSON.stringify(state.manifest));
+  renderManifest();
+}
+
+function renderManifest() {
+  const list = document.getElementById('manifest-list');
+  const query = state.manifestSearch.toLowerCase();
+  const filtered = state.manifest.filter(v => {
+    if (state.manifestFilter !== 'all' && v.type !== state.manifestFilter) return false;
+    if (query && !v.id.toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-title">Ничего не найдено</div></div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(v => {
+    const typeClass = v.type === 'release' ? 'release' : v.type === 'snapshot' ? 'snapshot' : 'old_beta';
+    return `
+      <div class="search-result-item" onclick="installVersion('${v.id}')">
+        <div class="sr-icon"><i class="bi bi-archive"></i></div>
+        <div class="sr-info">
+          <div class="sr-name">${escapeHtml(v.id)}</div>
+          <div class="sr-meta">
+            <span class="v-type-badge ${typeClass}" style="font-size:10px">${v.type}</span>
+            ${new Date(v.releaseTime).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterManifest() {
+  state.manifestSearch = document.getElementById('install-search').value;
+  renderManifest();
+}
+
+function filterManifestType(type, btn) {
+  state.manifestFilter = type;
+  document.querySelectorAll('#install-modal [data-filter]').forEach(b => b.classList.toggle('btn-primary', b === btn));
+  if (btn) btn.classList.add('btn-primary');
+  renderManifest();
+}
+
+async function installVersion(versionId) {
+  document.getElementById('install-progress').style.display = 'block';
+  state.installVersionId = versionId;
+
+  // Connect SSE
+  if (state.installSource) state.installSource.close();
+  const source = new EventSource(`/api/versions/progress/${versionId}`);
+  state.installSource = source;
+
+  source.onmessage = (e) => {
+    const p = JSON.parse(e.data);
+    const fill = document.getElementById('install-progress-fill');
+    const text = document.getElementById('install-progress-text');
+    fill.style.width = Math.min(p.percent || 0, 100) + '%';
+    text.textContent = p.task || 'Установка...';
+  };
+
+  source.addEventListener('done', () => {
+    source.close();
+    state.installSource = null;
+    document.getElementById('install-progress-fill').style.width = '100%';
+    document.getElementById('install-progress-text').textContent = 'Установка завершена!';
+    toast('Версия установлена!', 'success');
+    setTimeout(() => {
+      closeModal('install-modal');
+      loadProfiles();
+      loadInstalledVersions();
+    }, 1000);
+  });
+
+  try {
+    await api('/api/versions/install', {
+      method: 'POST',
+      body: JSON.stringify({ versionId }),
+    });
+  } catch (e) {
+    source.close();
+    state.installSource = null;
+    document.getElementById('install-progress').style.display = 'none';
+    toast(e.message, 'error');
+  }
+}
+
+function cancelInstallVersion() {
+  if (state.installVersionId && state.installSource) {
+    api(`/api/versions/cancel/${state.installVersionId}`, { method: 'POST' }).catch(() => {});
+    state.installSource.close();
+    state.installSource = null;
+    state.installVersionId = null;
+  }
+}
+
+/* ===== Mods Tab ===== */
+
+/* Loaders */
+let loaderState = { forge: false, fabric: false, quilt: false, fabricVer: '', forgeVer: '', quiltVer: '' };
+
+async function loadLoaders() {
+  const container = document.getElementById('loader-cards');
+  let forgeProfiles = [], fabricProfiles = [], quiltProfiles = [];
+  try {
+    const data = await api('/api/loader/profiles');
+    const profiles = data.profiles || [];
+    forgeProfiles = profiles.filter(p => p.loader === 'forge');
+    fabricProfiles = profiles.filter(p => p.loader === 'fabric');
+    quiltProfiles = profiles.filter(p => p.loader === 'quilt');
+    loaderState.forge = forgeProfiles.length > 0;
+    loaderState.fabric = fabricProfiles.length > 0;
+    loaderState.quilt = quiltProfiles.length > 0;
+    loaderState.forgeVer = forgeProfiles.length > 0 ? forgeProfiles[0].id : '';
+    loaderState.fabricVer = fabricProfiles.length > 0 ? fabricProfiles[0].id : '';
+    loaderState.quiltVer = quiltProfiles.length > 0 ? quiltProfiles[0].id : '';
+  } catch (e) {}
+
+  function renderVersionsList(profiles) {
+    if (profiles.length === 0) return '';
+    return `<ul class="loader-versions">${profiles.map(p => {
+      const mcVer = p.id.includes('-') ? p.id.split('-').pop() : p.id;
+      return `<li onclick="selectProfile('${p.id}');switchTab('news')" title="Выбрать ${p.id}">
+        <i class="bi bi-play-circle"></i> ${escapeHtml(p.id)}
+        <span class="loader-version-badge">${escapeHtml(p.loader)}</span>
+      </li>`;
+    }).join('')}</ul>`;
+  }
+
+  container.innerHTML = [
+    {
+      id: 'forge', name: 'Forge', icon: 'bi bi-fire', cls: 'forge',
+      profiles: forgeProfiles, count: forgeProfiles.length,
+    },
+    {
+      id: 'fabric', name: 'Fabric', icon: 'bi bi-grid-3x3-gap-fill', cls: 'fabric',
+      profiles: fabricProfiles, count: fabricProfiles.length,
+    },
+    {
+      id: 'quilt', name: 'Quilt', icon: 'bi bi-palette', cls: 'quilt',
+      profiles: quiltProfiles, count: quiltProfiles.length,
+    },
+  ].map(l => `
+    <div class="loader-card">
+      <div class="loader-icon ${l.cls}"><i class="${l.icon}"></i></div>
+      <div class="loader-name">${l.name}</div>
+      <div class="loader-status ${l.count > 0 ? 'installed' : 'not-installed'}">
+        ${l.count > 0 ? `Установлен (${l.count})` : 'Не установлен'}
+      </div>
+      ${renderVersionsList(l.profiles)}
+      <button class="btn ${l.count > 0 ? '' : 'btn-primary'}" onclick="showInstallLoaderModalFor('${l.id}')" style="margin-top:8px">
+        <i class="bi bi-plus-lg"></i> ${l.count > 0 ? 'Добавить версию' : 'Установить'}
+      </button>
+    </div>
+  `).join('');
+}
+
+function showInstallLoaderModal(mcVersion) {
+  const sel = document.getElementById('loader-mc');
+  // Try to select the given version if it exists in the dropdown
+  if ([...sel.options].some(o => o.value === mcVersion)) {
+    sel.value = mcVersion;
+  } else {
+    // Add it as a custom option
+    const opt = document.createElement('option');
+    opt.value = mcVersion; opt.textContent = mcVersion;
+    sel.insertBefore(opt, sel.firstChild);
+    sel.value = mcVersion;
+  }
+  document.getElementById('loader-ver').value = '';
+  showModal('loader-modal');
+}
+
+async function showInstallLoaderModalFor(type) {
+  document.getElementById('loader-type').value = type;
+  document.getElementById('loader-ver').value = '';
+  const sel = document.getElementById('loader-mc');
+  sel.innerHTML = '<option value="">Загрузка...</option>';
+  showModal('loader-modal');
+  // Load manifest and populate release versions
+  try {
+    let manifest = state.manifest;
+    if (!manifest || manifest.length === 0) {
+      const data = await api('/api/versions');
+      manifest = data.versions || [];
+      state.manifest = manifest;
+      localStorage.setItem('versionManifest', JSON.stringify(manifest));
+    }
+    const releases = manifest.filter(v => v.type === 'release').sort((a, b) => new Date(b.releaseTime) - new Date(a.releaseTime));
+    sel.innerHTML = releases.map(v => `<option value="${v.id}" ${v.id === releases[0]?.id ? 'selected' : ''}>${v.id}</option>`).join('');
+  } catch (e) {
+    sel.innerHTML = '<option value="">Ошибка загрузки версий</option>';
+  }
+}
+
+async function installLoader() {
+  const loader = document.getElementById('loader-type').value;
+  const mcVersion = document.getElementById('loader-mc').value;
+  const loaderVersion = document.getElementById('loader-ver').value.trim();
+  const fabricApi = document.getElementById('loader-fabric-api').checked;
+
+  if (!mcVersion) return toast('Укажите версию Minecraft', 'error');
+
+  document.getElementById('loader-progress').style.display = 'block';
+  document.getElementById('loader-progress-text').textContent = 'Установка загрузчика...';
+
+  try {
+    const res = await api('/api/loader/install', {
+      method: 'POST',
+      body: JSON.stringify({
+        loader,
+        mcVersion,
+        loaderVersion: loaderVersion || undefined,
+      }),
+    });
+
+    document.getElementById('loader-progress-text').textContent = 'Загрузчик установлен!';
+
+    if (fabricApi && loader === 'fabric') {
+      toast('Fabric API не может быть установлен автоматически. Скачайте его вручную с Modrinth.', 'info');
+    }
+
+    toast(res.message || 'Загрузчик установлен!', 'success');
+    setTimeout(() => {
+      closeModal('loader-modal');
+      document.getElementById('loader-progress').style.display = 'none';
+      loadProfiles();
+      loadInstalledVersions();
+      loadLoaders();
+    }, 1000);
+  } catch (e) {
+    document.getElementById('loader-progress').style.display = 'none';
+    toast(e.message, 'error');
+  }
+}
+
+/* Mods List */
+/* ===== Mod Profiles ===== */
+async function loadModProfiles() {
+  try {
+    const data = await api('/api/mod-profiles');
+    state.modProfiles = data.profiles || [];
+    state.activeModProfileId = data.activeProfile || null;
+    state.profileModIDs = [];
+    if (state.activeModProfileId) {
+      const ap = state.modProfiles.find(p => p.id === state.activeModProfileId);
+      if (ap) state.profileModIDs = ap.modIds || [];
+    }
+  } catch (e) {
+    state.modProfiles = [];
+    state.activeModProfileId = null;
+    state.profileModIDs = [];
+  }
+  // Sync sidebar selection -> mod profile if possible
+  if (!state.activeModProfileId && state.selectedProfileId && state.modProfiles.some(p => p.id === state.selectedProfileId)) {
+    try {
+      await api(`/api/mod-profiles/${encodeURIComponent(state.selectedProfileId)}/activate`, { method: 'POST' });
+      state.activeModProfileId = state.selectedProfileId;
+      const ap = state.modProfiles.find(p => p.id === state.selectedProfileId);
+      if (ap) state.profileModIDs = ap.modIds || [];
+    } catch (e) {}
+  }
+  renderModProfileBar();
+}
+
+function renderModProfileBar() {
+  const label = document.getElementById('mp-version-label');
+  const badge = document.getElementById('mp-active-badge');
+
+  const profileName = state.selectedProfileId && state.profiles[state.selectedProfileId]
+    ? state.profiles[state.selectedProfileId].name
+    : null;
+
+  if (state.activeModProfileId) {
+    const display = profileName || state.activeModProfileId;
+    label.textContent = `Моды для: ${escapeHtml(display)}`;
+    badge.style.display = 'inline-flex';
+  } else {
+    label.textContent = profileName ? `Моды для: ${escapeHtml(profileName)} (нет профиля)` : '—';
+    badge.style.display = 'none';
+  }
+}
+
+async function selectModProfile(id) {
+  if (!id) {
+    await deactivateModProfile();
+    return;
+  }
+  try {
+    await api(`/api/mod-profiles/${encodeURIComponent(id)}/activate`, { method: 'POST' });
+    toast('Профиль модов активирован', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+  await loadModProfiles();
+  await loadMods();
+}
+
+async function deactivateModProfile() {
+  try {
+    await api('/api/mod-profiles/deactivate', { method: 'POST' });
+    toast('Профиль модов отключён', 'success');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+  await loadModProfiles();
+  await loadMods();
+}
+
+function showCreateModProfileModal() {
+  document.getElementById('modprofile-name').value = '';
+  showModal('modprofile-modal');
+  setTimeout(() => document.getElementById('modprofile-name').focus(), 100);
+}
+
+async function createModProfile() {
+  const name = document.getElementById('modprofile-name').value.trim();
+  if (!name) return toast('Введите название профиля', 'error');
+  try {
+    await api('/api/mod-profiles', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    toast('Профиль создан', 'success');
+    closeModal('modprofile-modal');
+    await loadModProfiles();
+    // Activate the new profile
+    await selectModProfile(name);
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function deleteModProfile() {
+  const activeId = state.activeModProfileId;
+  if (!activeId) return;
+  const ap = state.modProfiles.find(p => p.id === activeId);
+  confirmDialog('Удалить профиль', `Удалить профиль модов «${ap ? ap.name : activeId}»? Моды останутся в папке mods, но их привязка к профилю будет потеряна.`, async () => {
+    try {
+      await api(`/api/mod-profiles/${encodeURIComponent(activeId)}`, { method: 'DELETE' });
+      toast('Профиль удалён', 'success');
+      await loadModProfiles();
+      await loadMods();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+}
+
+async function loadMods() {
+  const container = document.getElementById('mod-list');
+  try {
+    const data = await api('/api/mods/list');
+    state.mods = data.mods || [];
+    state.activeModProfileId = data.activeProfile || null;
+    state.profileModIDs = data.profileModIDs || [];
+  } catch (e) {
+    state.mods = [];
+  }
+
+  if (state.mods.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-puzzle"></i></div>
+        <div class="empty-title">Нет установленных модов</div>
+        <div class="empty-desc">Нажмите «Найти мод», чтобы добавить моды из Modrinth или CurseForge</div>
+      </div>
+    `;
+    return;
+  }
+
+  const inProfile = id => state.profileModIDs.includes(id);
+
+  container.innerHTML = state.mods.map(m => `
+    <div class="mod-item ${state.activeModProfileId && inProfile(m.id) ? 'in-profile' : ''}">
+      <div class="mod-icon">${m.iconUrl ? `<img src="${m.iconUrl}" alt="">` : '<i class="bi bi-puzzle"></i>'}</div>
+      <div class="mod-info">
+        <div class="mod-name">${escapeHtml(m.name)}</div>
+        <div class="mod-meta">v${escapeHtml(m.version || '?')} ${m.loader ? '· ' + m.loader : ''} ${m.gameVersion ? '· ' + m.gameVersion : ''} ${state.activeModProfileId && inProfile(m.id) ? '· <span style="color:var(--accent)">в профиле</span>' : state.activeModProfileId ? '· <span style="color:var(--text-muted)">не в профиле</span>' : ''}</div>
+      </div>
+      <div class="mod-toggle">
+        <label class="toggle">
+          <input type="checkbox" ${m.enabled ? 'checked' : ''} onchange="toggleMod('${m.id}')">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <button class="mod-delete" onclick="deleteMod('${m.id}', '${escapeHtml(m.name)}')" title="Удалить"><i class="bi bi-trash"></i></button>
+    </div>
+  `).join('');
+}
+
+async function toggleMod(id) {
+  try {
+    await api('/api/mods/toggle', { method: 'POST', body: JSON.stringify({ id }) });
+    await loadModProfiles();
+    await loadMods();
+  } catch (e) {
+    toast(e.message, 'error');
+    loadMods();
+  }
+}
+
+function deleteMod(id, name) {
+  confirmDialog('Удаление мода', `Удалить мод «${name}»?`, async () => {
+    try {
+      await api(`/api/mods/${id}`, { method: 'DELETE' });
+      toast('Мод удалён', 'success');
+      loadModProfiles();
+      loadMods();
+    } catch (e) {
+      toast(e.message, 'error');
+    }
+  });
+}
+
+/* ===== Mod Search Modal ===== */
+let modSearchResults = [];
+
+async function searchMods() {
+  const query = document.getElementById('modsearch-query').value.trim();
+  const source = document.getElementById('modsearch-source').value;
+  if (!query) return toast('Введите запрос', 'error');
+
+  const container = document.getElementById('modsearch-results');
+  container.innerHTML = '<div class="spinner-wrap"><div class="spinner-lg"></div></div>';
+
+  try {
+    const ep = source === 'modrinth' ? '/api/mods/search/modrinth' : '/api/mods/search/curseforge';
+    const data = await api(`${ep}?query=${encodeURIComponent(query)}&limit=20`);
+    modSearchResults = data.hits || [];
+  } catch (e) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-title">${e.message}</div></div>`;
+    return;
+  }
+
+  if (modSearchResults.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-title">Ничего не найдено</div></div>';
+    return;
+  }
+
+  container.innerHTML = modSearchResults.map(r => `
+    <div class="search-result-item" onclick="installModFromSearch('${r.projectId}')">
+      <div class="sr-icon">${r.iconUrl ? `<img src="${r.iconUrl}" alt="">` : '<i class="bi bi-puzzle"></i>'}</div>
+      <div class="sr-info">
+        <div class="sr-name">${escapeHtml(r.name)}</div>
+        <div class="sr-desc">${escapeHtml(r.description || '')}</div>
+        <div class="sr-meta">${r.gameVersion ? r.gameVersion + ' · ' : ''}${r.loader || ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function installModFromSearch(projectId) {
+  const source = document.getElementById('modsearch-source').value;
+  try {
+    await api('/api/mods/install', {
+      method: 'POST',
+      body: JSON.stringify({
+        source,
+        projectId,
+        gameVersion: '',
+        loader: '',
+      }),
+    });
+    toast('Мод установлен!', 'success');
+    loadModProfiles();
+    loadMods();
+    closeModal('modsearch-modal');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+/* ===== Settings ===== */
+async function loadSettings() {
+  try {
+    const s = await api('/api/settings');
+    state.settings = s;
+    document.getElementById('mem-min').value = s.minMemory || 1024;
+    document.getElementById('mem-max').value = s.maxMemory || 4096;
+    document.getElementById('set-java-path').value = s.javaPath || '';
+    document.getElementById('set-mc-dir').value = s.minecraftDir || '';
+    document.getElementById('set-win-w').value = s.windowWidth || 854;
+    document.getElementById('set-win-h').value = s.windowHeight || 480;
+    document.getElementById('set-cf-key').value = s.curseForgeKey || '';
+    document.getElementById('set-lang').value = s.language || 'ru-ru';
+    document.getElementById('set-auth-injector').checked = s.useAuthlibInjector || false;
+    document.getElementById('set-auth-server').checked = s.authServerEnabled || false;
+    document.getElementById('set-auto-update').checked = s.checkUpdates !== false;
+    updateMemLabels();
+  } catch (e) {
+    toast('Не удалось загрузить настройки: ' + e.message, 'error');
+  }
+}
+
+function updateMemLabels() {
+  const min = document.getElementById('mem-min').value;
+  const max = document.getElementById('mem-max').value;
+  document.getElementById('mem-min-val').textContent = min + ' MB';
+  document.getElementById('mem-max-val').textContent = max + ' MB';
+}
+
+async function saveSettings() {
+  const body = {
+    minMemory: parseInt(document.getElementById('mem-min').value),
+    maxMemory: parseInt(document.getElementById('mem-max').value),
+    javaPath: document.getElementById('set-java-path').value.trim(),
+    minecraftDir: document.getElementById('set-mc-dir').value.trim(),
+    windowWidth: parseInt(document.getElementById('set-win-w').value) || 854,
+    windowHeight: parseInt(document.getElementById('set-win-h').value) || 480,
+    curseForgeKey: document.getElementById('set-cf-key').value.trim(),
+    language: document.getElementById('set-lang').value,
+    useAuthlibInjector: document.getElementById('set-auth-injector').checked,
+    authServerEnabled: document.getElementById('set-auth-server').checked,
+    checkUpdates: document.getElementById('set-auto-update').checked,
+  };
+
+  try {
+    await api('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+    toast('Настройки сохранены', 'success');
+    state.settings = body;
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function openMinecraftFolder() {
+  try {
+    await api('/api/settings/open-folder', { method: 'POST' });
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+/* ===== Logs ===== */
+function initLogs() {
+  if (state.logSource) return;
+  state.logSource = new EventSource('/api/launch/logs?limit=50');
+
+  state.logSource.onmessage = (e) => {
+    const entry = JSON.parse(e.data);
+    state.logs.push(entry);
+    appendLogLine(entry);
+  };
+
+  state.logSource.addEventListener('done', () => {
+    state.logSource.close();
+    state.logSource = null;
+  });
+
+  state.logSource.onerror = () => {
+    // Logs not yet available (no game running) - ignore
+  };
+}
+
+function appendLogLine(entry) {
+  const container = document.getElementById('log-container');
+  const div = document.createElement('div');
+  div.className = 'log-line log-' + (entry.type || 'stdout');
+  div.textContent = entry.line;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function clearLogs() {
+  document.getElementById('log-container').innerHTML = '';
+  state.logs = [];
+}
+
+function copyLogs() {
+  const text = state.logs.map(l => l.line).join('\n');
+  navigator.clipboard.writeText(text).then(() => toast('Логи скопированы', 'success')).catch(() => {});
+}
+
+/* ===== Utility ===== */
+function escapeHtml(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+/* ===== Init ===== */
+async function init() {
+  // Load initial data
+  await loadAccount();
+  await loadProfiles();
+  updatePlayButton();
+
+  // Setup sidebar account click
+  document.getElementById('sidebar-account').addEventListener('click', (e) => {
+    if (e.target.closest('button')) return;
+    showLoginModal();
+  });
+
+  // Check game status on start
+  try {
+    const s = await api('/api/launch/status');
+    if (s.running) {
+      state.gameRunning = true;
+      state.gamePid = s.pid;
+      updatePlayButton();
+      if (playStatusInterval) clearInterval(playStatusInterval);
+      playStatusInterval = setInterval(pollGameStatus, 3000);
+    }
+  } catch (_) {}
+
+  // Keyboard shortcut: Escape closes modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.active').forEach(m => {
+        if (m.id === 'install-modal') cancelInstallVersion();
+        m.classList.remove('active');
+      });
+    }
+  });
+
+  // Close sidebar on click outside on mobile
+  document.addEventListener('click', (e) => {
+    const sidebar = document.getElementById('sidebar');
+    const toggle = document.getElementById('menu-toggle');
+    if (window.innerWidth <= 768 && sidebar.classList.contains('open') &&
+        !sidebar.contains(e.target) && !toggle.contains(e.target)) {
+      sidebar.classList.remove('open');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

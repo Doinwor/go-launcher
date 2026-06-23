@@ -1,0 +1,57 @@
+version: 2
+
+project_name: offline-launcher
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: launcher
+    main: ./cmd/launcher
+    binary: launcher
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: darwin
+        goarch: arm64
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: release
+    format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - web/**/*
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+
+release:
+  github:
+    owner: user
+    name: offline-launcher
+  draft: true
+  name_template: "v{{ .Version }}"

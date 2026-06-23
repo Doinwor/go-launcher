@@ -1,0 +1,9 @@
+build/
+dist/
+*.exe.old
+*.log
+*.zip
+launcher
+.install_id
+.DS_Store
+Thumbs.db

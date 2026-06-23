@@ -1,0 +1,472 @@
+package update
+
+import (
+	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"time"
+)
+
+const CurrentVersion = "1.0.0"
+
+var DefaultManifestURL = "https://your-update-server.com/update.json"
+
+type Manifest struct {
+	Version     string `json:"version"`
+	DownloadURL string `json:"downloadUrl"`
+	SHA256      string `json:"sha256"`
+	Changelog   string `json:"changelog"`
+	MinVersion  string `json:"minVersion,omitempty"`
+}
+
+type CheckResult struct {
+	HasUpdate bool      `json:"hasUpdate"`
+	Current   string    `json:"current"`
+	Latest    string    `json:"latest"`
+	Changelog string    `json:"changelog,omitempty"`
+	Error     string    `json:"error,omitempty"`
+}
+
+type UpdateStatus struct {
+	mu          sync.RWMutex
+	downloading bool
+	progress    float64
+	message     string
+	done        bool
+	err         string
+}
+
+var status = &UpdateStatus{}
+
+func Status() map[string]interface{} {
+	status.mu.RLock()
+	defer status.mu.RUnlock()
+	return map[string]interface{}{
+		"downloading": status.downloading,
+		"progress":    status.progress,
+		"message":     status.message,
+		"done":        status.done,
+		"error":       status.err,
+	}
+}
+
+func Check(manifestURL string) (*CheckResult, error) {
+	if manifestURL == "" {
+		manifestURL = DefaultManifestURL
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(manifestURL)
+	if err != nil {
+		return &CheckResult{
+			HasUpdate: false,
+			Current:   CurrentVersion,
+			Latest:    CurrentVersion,
+			Error:     fmt.Sprintf("update server unreachable: %v", err),
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &CheckResult{
+			HasUpdate: false,
+			Current:   CurrentVersion,
+			Latest:    CurrentVersion,
+			Error:     fmt.Sprintf("update server HTTP %d", resp.StatusCode),
+		}, nil
+	}
+
+	var manifest Manifest
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		return nil, fmt.Errorf("parse manifest: %w", err)
+	}
+
+	hasUpdate := compareVersions(manifest.Version, CurrentVersion) > 0
+
+	result := &CheckResult{
+		HasUpdate: hasUpdate,
+		Current:   CurrentVersion,
+		Latest:    manifest.Version,
+	}
+	if hasUpdate {
+		result.Changelog = manifest.Changelog
+	}
+
+	return result, nil
+}
+
+func Apply(manifestURL string, appDir string) error {
+	status.mu.Lock()
+	status.downloading = true
+	status.progress = 0
+	status.message = "Загрузка манифеста..."
+	status.done = false
+	status.err = ""
+	status.mu.Unlock()
+
+	defer func() {
+		status.mu.Lock()
+		status.downloading = false
+		status.mu.Unlock()
+	}()
+
+	if manifestURL == "" {
+		manifestURL = DefaultManifestURL
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(manifestURL)
+	if err != nil {
+		setError(fmt.Sprintf("manifest request: %v", err))
+		return fmt.Errorf("manifest: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		setError(fmt.Sprintf("manifest HTTP %d", resp.StatusCode))
+		return fmt.Errorf("manifest HTTP %d", resp.StatusCode)
+	}
+
+	var manifest Manifest
+	if err := json.NewDecoder(resp.Body).Decode(&manifest); err != nil {
+		setError(fmt.Sprintf("parse manifest: %v", err))
+		return fmt.Errorf("parse manifest: %w", err)
+	}
+
+	setProgress(0.1, fmt.Sprintf("Новая версия: %s", manifest.Version))
+
+	tmpDir := filepath.Join(os.TempDir(), "offline-launcher-update")
+	os.RemoveAll(tmpDir)
+	os.MkdirAll(tmpDir, 0755)
+
+	zipPath := filepath.Join(tmpDir, "update.zip")
+	setProgress(0.15, "Скачивание обновления...")
+
+	if err := downloadFile(zipPath, manifest.DownloadURL); err != nil {
+		setError(fmt.Sprintf("download: %v", err))
+		return fmt.Errorf("download: %w", err)
+	}
+
+	setProgress(0.6, "Проверка целостности...")
+
+	if manifest.SHA256 != "" {
+		if err := verifySHA256(zipPath, manifest.SHA256); err != nil {
+			setError(fmt.Sprintf("SHA256 mismatch: %v", err))
+			return fmt.Errorf("sha256: %w", err)
+		}
+	}
+
+	setProgress(0.7, "Распаковка...")
+
+	extractDir := filepath.Join(tmpDir, "extracted")
+	if err := extractZip(zipPath, extractDir); err != nil {
+		setError(fmt.Sprintf("extract: %v", err))
+		return fmt.Errorf("extract: %w", err)
+	}
+
+	setProgress(0.85, "Установка...")
+
+	if err := applyUpdate(extractDir, appDir); err != nil {
+		setError(fmt.Sprintf("apply: %v", err))
+		return err
+	}
+
+	setProgress(1.0, "Готово. Перезапуск...")
+
+	status.mu.Lock()
+	status.done = true
+	status.mu.Unlock()
+
+	return nil
+}
+
+func Restart() error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("get executable path: %w", err)
+	}
+
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "start", "", execPath)
+	} else {
+		cmd = exec.Command(execPath)
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("restart: %w", err)
+	}
+
+	os.Exit(0)
+	return nil
+}
+
+func applyUpdate(extractDir, appDir string) error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("executable path: %w", err)
+	}
+
+	execName := filepath.Base(execPath)
+	execDir := filepath.Dir(execPath)
+
+	backupPath := filepath.Join(execDir, execName+".old")
+
+	// Find the binary in extracted dir
+	extractedBin := filepath.Join(extractDir, execName)
+	if _, err := os.Stat(extractedBin); os.IsNotExist(err) {
+		// Try without path
+		entries, _ := filepath.Glob(filepath.Join(extractDir, "*.exe"))
+		if len(entries) > 0 {
+			extractedBin = entries[0]
+		}
+		entries, _ = filepath.Glob(filepath.Join(extractDir, "*"))
+		for _, e := range entries {
+			if !strings.HasSuffix(e, ".zip") && !strings.HasSuffix(e, ".old") {
+				info, err := os.Stat(e)
+				if err == nil && !info.IsDir() && info.Mode()&0111 != 0 {
+					extractedBin = e
+					break
+				}
+			}
+		}
+	}
+
+	// Backup current binary
+	os.Remove(backupPath)
+	if err := copyFile(execPath, backupPath); err != nil {
+		return fmt.Errorf("backup binary: %w", err)
+	}
+
+	// Replace binary
+	if err := replaceFile(extractedBin, execPath); err != nil {
+		return fmt.Errorf("replace binary: %w", err)
+	}
+
+	// Update static files (web/)
+	extractedWeb := filepath.Join(extractDir, "web")
+	if info, err := os.Stat(extractedWeb); err == nil && info.IsDir() {
+		webDir := filepath.Join(execDir, "web")
+		webBackup := filepath.Join(execDir, "web.old")
+		os.RemoveAll(webBackup)
+		if info, err := os.Stat(webDir); err == nil && info.IsDir() {
+			if err := os.Rename(webDir, webBackup); err != nil {
+				// Non-fatal: continue with new web files
+			}
+		}
+		if err := copyDir(extractedWeb, webDir); err != nil {
+			return fmt.Errorf("update web files: %w", err)
+		}
+		os.RemoveAll(webBackup)
+	}
+
+	// Clean up temp
+	os.RemoveAll(filepath.Join(os.TempDir(), "offline-launcher-update"))
+
+	return nil
+}
+
+func compareVersions(a, b string) int {
+	an := parseVersion(a)
+	bn := parseVersion(b)
+	for i := 0; i < 3; i++ {
+		if an[i] > bn[i] {
+			return 1
+		}
+		if an[i] < bn[i] {
+			return -1
+		}
+	}
+	return 0
+}
+
+func parseVersion(v string) [3]int {
+	var res [3]int
+	parts := strings.Split(strings.TrimPrefix(v, "v"), ".")
+	for i := 0; i < 3 && i < len(parts); i++ {
+		fmt.Sscanf(parts[i], "%d", &res[i])
+	}
+	return res
+}
+
+func downloadFile(destPath, url string) error {
+	dir := filepath.Dir(destPath)
+	os.MkdirAll(dir, 0755)
+
+	out, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	buf := make([]byte, 32*1024)
+	var written int64
+	total := resp.ContentLength
+
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			if _, werr := out.Write(buf[:n]); werr != nil {
+				return werr
+			}
+			written += int64(n)
+			if total > 0 {
+				setProgress(0.15+0.45*(float64(written)/float64(total)), "Скачивание обновления...")
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func verifySHA256(path, expected string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	h := sha256.Sum256(data)
+	got := hex.EncodeToString(h[:])
+	if got != strings.ToLower(expected) {
+		return fmt.Errorf("expected %s, got %s", expected, got)
+	}
+	return nil
+}
+
+func extractZip(src, dest string) error {
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		fpath := filepath.Join(dest, f.Name)
+
+		if !strings.HasPrefix(filepath.Clean(fpath), filepath.Clean(dest)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid zip path: %s", f.Name)
+		}
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(fpath, 0755)
+			continue
+		}
+
+		os.MkdirAll(filepath.Dir(fpath), 0755)
+
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+
+		out, err := os.OpenFile(fpath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+		if err != nil {
+			rc.Close()
+			return err
+		}
+
+		_, err = io.Copy(out, rc)
+		out.Close()
+		rc.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func replaceFile(src, dst string) error {
+	os.Remove(dst)
+	return copyFile(src, dst)
+}
+
+func copyFile(src, dst string) error {
+	s, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	info, err := s.Stat()
+	if err != nil {
+		return err
+	}
+
+	d, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	_, err = io.Copy(d, s)
+	return err
+}
+
+func copyDir(src, dst string) error {
+	os.MkdirAll(dst, 0755)
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := copyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func setProgress(p float64, msg string) {
+	status.mu.Lock()
+	status.progress = p
+	status.message = msg
+	status.mu.Unlock()
+}
+
+func setError(msg string) {
+	status.mu.Lock()
+	status.err = msg
+	status.downloading = false
+	status.mu.Unlock()
+}
