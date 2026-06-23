@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -113,7 +114,7 @@ func (a *API) ProcessManager() *launch.ProcessManager {
 	return a.procMgr
 }
 
-func (a *API) SetupRouter(staticDir string) *gin.Engine {
+func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 	r := gin.Default()
 	r.Use(corsMiddleware())
 
@@ -212,10 +213,20 @@ func (a *API) SetupRouter(staticDir string) *gin.Engine {
 		}
 	}
 
-	r.Static("/web", staticDir)
 	r.Static("/skin", a.skinMgr.SkinsDir())
+
+	if embeddedFS != nil {
+		r.StaticFS("/web", http.FS(embeddedFS))
+	} else if staticDir != "" {
+		r.Static("/web", staticDir)
+	}
+
 	r.GET("/", func(c *gin.Context) {
-		c.File(filepath.Join(staticDir, "index.html"))
+		if embeddedFS != nil {
+			c.Redirect(http.StatusMovedPermanently, "/web/index.html")
+		} else {
+			c.File(filepath.Join(staticDir, "index.html"))
+		}
 	})
 
 	return r
