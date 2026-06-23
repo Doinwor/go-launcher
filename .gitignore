@@ -1,5 +1,7 @@
 build/
 dist/
+*.exe
+*.exe~
 *.exe.old
 *.log
 *.zip
