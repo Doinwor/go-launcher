@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,7 +71,7 @@ func New(authMgr *auth.Manager, profileStore *profiles.Store, settingsMgr *setti
 		launchCfg.MinecraftDir = filepath.Join(os.Getenv("APPDATA"), ".minecraft")
 	}
 	if err := os.MkdirAll(launchCfg.MinecraftDir, 0755); err != nil {
-		// Не фатально — просто логируем
+		// РќРµ С„Р°С‚Р°Р»СЊРЅРѕ вЂ” РїСЂРѕСЃС‚Рѕ Р»РѕРіРёСЂСѓРµРј
 		fmt.Printf("warning: cannot create minecraft dir: %v\n", err)
 	}
 	mm := mods.NewManager(launchCfg.MinecraftDir, baseDir)
@@ -117,6 +118,7 @@ func (a *API) ProcessManager() *launch.ProcessManager {
 func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 	r := gin.Default()
 	r.Use(corsMiddleware())
+	r.Use(noCacheMiddleware())
 
 	api := r.Group("/api")
 	{
@@ -223,14 +225,28 @@ func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 	}
 
 	r.GET("/", func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
 		if embeddedFS != nil {
-			c.Redirect(http.StatusMovedPermanently, "/web/index.html")
+			c.Redirect(http.StatusTemporaryRedirect, "/web/index.html")
 		} else {
 			c.File(filepath.Join(staticDir, "index.html"))
 		}
 	})
 
 	return r
+}
+
+func noCacheMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/web/") {
+			c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+			c.Header("Pragma", "no-cache")
+			c.Header("Expires", "0")
+		}
+		c.Next()
+	}
 }
 
 func corsMiddleware() gin.HandlerFunc {
@@ -246,7 +262,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// checkConnectivity проверяет доступ к Mojang API с таймаутом 3 секунды
+// checkConnectivity РїСЂРѕРІРµСЂСЏРµС‚ РґРѕСЃС‚СѓРї Рє Mojang API СЃ С‚Р°Р№РјР°СѓС‚РѕРј 3 СЃРµРєСѓРЅРґС‹
 func checkConnectivity() bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -425,7 +441,7 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 	var req launchStartReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.L().Warn("launch: missing versionId")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "не указан ID версии"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "РЅРµ СѓРєР°Р·Р°РЅ ID РІРµСЂСЃРёРё"})
 		return
 	}
 
@@ -434,7 +450,7 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 	acc := a.authMgr.GetActiveAccount()
 	if acc == nil {
 		log.L().Warn("launch: no active account")
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "нет активного аккаунта. Войдите в систему."})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "РЅРµС‚ Р°РєС‚РёРІРЅРѕРіРѕ Р°РєРєР°СѓРЅС‚Р°. Р’РѕР№РґРёС‚Рµ РІ СЃРёСЃС‚РµРјСѓ."})
 		return
 	}
 
@@ -451,7 +467,7 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 	versionJSON, err := launch.ReadVersionJSON(versionJSONPath)
 	if err != nil {
 		log.L().Error("launch: version not installed", "version", req.VersionID, "path", versionJSONPath, "error", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("версия %s не установлена", req.VersionID)})
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("РІРµСЂСЃРёСЏ %s РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅР°", req.VersionID)})
 		return
 	}
 	log.L().Info("version JSON loaded", "version", req.VersionID)
@@ -481,8 +497,8 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 		if installErr != nil {
 			log.L().Error("failed to auto-install Java", "version", javaMajor, "error", installErr.Error())
 			c.JSON(http.StatusPreconditionFailed, gin.H{
-				"error":       fmt.Sprintf("Java %d+ не найден. Автоустановка не удалась: %s", javaMajor, installErr.Error()),
-				"message":     fmt.Sprintf("Установите Java %d+ вручную для запуска Minecraft %s", javaMajor, req.VersionID),
+				"error":       fmt.Sprintf("Java %d+ РЅРµ РЅР°Р№РґРµРЅ. РђРІС‚РѕСѓСЃС‚Р°РЅРѕРІРєР° РЅРµ СѓРґР°Р»Р°СЃСЊ: %s", javaMajor, installErr.Error()),
+				"message":     fmt.Sprintf("РЈСЃС‚Р°РЅРѕРІРёС‚Рµ Java %d+ РІСЂСѓС‡РЅСѓСЋ РґР»СЏ Р·Р°РїСѓСЃРєР° Minecraft %s", javaMajor, req.VersionID),
 				"downloadUrl": launch.SuggestJavaDownload(),
 			})
 			return
@@ -583,7 +599,7 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 	pid, err := a.procMgr.Start(javaPath, cmdArgs, a.launchCfg.MinecraftDir)
 	if err != nil {
 		log.L().Error("launch: failed to start process", "version", req.VersionID, "error", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось запустить Minecraft: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РїСѓСЃС‚РёС‚СЊ Minecraft: " + err.Error()})
 		return
 	}
 
@@ -598,11 +614,11 @@ func (a *API) handleLaunchStart(c *gin.Context) {
 func (a *API) handleLaunchStop(c *gin.Context) {
 	if err := a.procMgr.Stop(); err != nil {
 		log.L().Warn("launch stop: process not running", "error", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "игра не запущена: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РёРіСЂР° РЅРµ Р·Р°РїСѓС‰РµРЅР°: " + err.Error()})
 		return
 	}
 	log.L().Info("game process stopped")
-	c.JSON(http.StatusOK, gin.H{"message": "игра остановлена"})
+	c.JSON(http.StatusOK, gin.H{"message": "РёРіСЂР° РѕСЃС‚Р°РЅРѕРІР»РµРЅР°"})
 }
 
 func (a *API) handleLaunchStatus(c *gin.Context) {
@@ -701,20 +717,28 @@ func (a *API) handleAuthlibDownload(c *gin.Context) {
 
 	if err := authlib.DownloadJar(appDir); err != nil {
 		log.L().Error("authlib-injector download failed", "error", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось скачать authlib-injector: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ authlib-injector: " + err.Error()})
 		return
 	}
 
 	log.L().Info("authlib-injector downloaded successfully")
 	c.JSON(http.StatusOK, gin.H{
-		"message": "authlib-injector скачан",
+		"message": "authlib-injector СЃРєР°С‡Р°РЅ",
 		"path":    authlib.JarPath(appDir),
 	})
 }
 
+type versionedSettings struct {
+	settings.AppSettings
+	LauncherVersion string `json:"launcherVersion"`
+}
+
 func (a *API) handleGetSettings(c *gin.Context) {
 	s := a.settingsMgr.Get()
-	c.JSON(http.StatusOK, s)
+	c.JSON(http.StatusOK, versionedSettings{
+		AppSettings:     *s,
+		LauncherVersion: update.CurrentVersion,
+	})
 }
 
 func (a *API) handleUpdateSettings(c *gin.Context) {
@@ -732,9 +756,9 @@ func (a *API) handleUpdateSettings(c *gin.Context) {
 		s.MinecraftDir = filepath.Join(os.Getenv("APPDATA"), ".minecraft")
 	}
 
-	// Создать папку .minecraft, если её нет
+	// РЎРѕР·РґР°С‚СЊ РїР°РїРєСѓ .minecraft, РµСЃР»Рё РµС‘ РЅРµС‚
 	if err := os.MkdirAll(s.MinecraftDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось создать папку .minecraft: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РїР°РїРєСѓ .minecraft: " + err.Error()})
 		return
 	}
 
@@ -769,7 +793,7 @@ func (a *API) handleOpenFolder(c *gin.Context) {
 		cmd = exec.Command("xdg-open", mcDir)
 	}
 	if err := cmd.Start(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось открыть папку: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РєСЂС‹С‚СЊ РїР°РїРєСѓ: " + err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "folder opened"})
@@ -1007,7 +1031,7 @@ func (a *API) handleLoaderInstall(c *gin.Context) {
 	if javaPath == "" {
 		c.JSON(http.StatusPreconditionFailed, gin.H{
 			"error":       "Java 17+ not found",
-			"message":     "Установите Java 17+",
+			"message":     "РЈСЃС‚Р°РЅРѕРІРёС‚Рµ Java 17+",
 			"downloadUrl": launch.SuggestJavaDownload(),
 		})
 		return
@@ -1024,7 +1048,7 @@ func (a *API) handleLoaderInstall(c *gin.Context) {
 	a.modProfileMan.EnsureVersionProfile(resp.ProfileID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":     fmt.Sprintf("%s %s установлен для Minecraft %s", mods.LoaderDisplayName(req.Loader), resp.LoaderVersion, req.MCVersion),
+		"message":     fmt.Sprintf("%s %s СѓСЃС‚Р°РЅРѕРІР»РµРЅ РґР»СЏ Minecraft %s", mods.LoaderDisplayName(req.Loader), resp.LoaderVersion, req.MCVersion),
 		"result":      resp,
 	})
 }
@@ -1258,7 +1282,7 @@ func (a *API) handleGetVersions(c *gin.Context) {
 				c.JSON(http.StatusOK, gin.H{"versions": a.manifestCache.Versions, "cached": true})
 				return
 			}
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "нет подключения к интернету. Проверьте соединение и повторите попытку."})
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "РЅРµС‚ РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє РёРЅС‚РµСЂРЅРµС‚Сѓ. РџСЂРѕРІРµСЂСЊС‚Рµ СЃРѕРµРґРёРЅРµРЅРёРµ Рё РїРѕРІС‚РѕСЂРёС‚Рµ РїРѕРїС‹С‚РєСѓ."})
 			return
 		}
 		log.L().Info("fetching version manifest from Mojang")
@@ -1268,7 +1292,7 @@ func (a *API) handleGetVersions(c *gin.Context) {
 				log.L().Warn("failed to refresh manifest, using stale cache", "error", err.Error())
 			} else {
 				log.L().Error("failed to fetch version manifest", "error", err.Error())
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось загрузить список версий. Попробуйте позже."})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє РІРµСЂСЃРёР№. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ."})
 				return
 			}
 		} else {
@@ -1296,7 +1320,7 @@ func (a *API) handleInstalledVersions(c *gin.Context) {
 	ids, err := a.downloadMgr.InstalledVersions()
 	if err != nil {
 		log.L().Error("failed to list installed versions", "error", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось получить список установленных версий"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє СѓСЃС‚Р°РЅРѕРІР»РµРЅРЅС‹С… РІРµСЂСЃРёР№"})
 		return
 	}
 	log.L().Info("listed installed versions", "count", len(ids))
@@ -1331,7 +1355,7 @@ func (a *API) handleInstallVersion(c *gin.Context) {
 	var req installVersionReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.L().Warn("install version: missing versionId in request")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "не указан ID версии"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "РЅРµ СѓРєР°Р·Р°РЅ ID РІРµСЂСЃРёРё"})
 		return
 	}
 
@@ -1339,11 +1363,11 @@ func (a *API) handleInstallVersion(c *gin.Context) {
 
 	if !a.checkConnectivityFn() {
 		log.L().Error("install version: no internet", "version", req.VersionID)
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "нет подключения к интернету. Установка невозможна."})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "РЅРµС‚ РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє РёРЅС‚РµСЂРЅРµС‚Сѓ. РЈСЃС‚Р°РЅРѕРІРєР° РЅРµРІРѕР·РјРѕР¶РЅР°."})
 		return
 	}
 
-	// Проверка: версия должна существовать в манифесте
+	// РџСЂРѕРІРµСЂРєР°: РІРµСЂСЃРёСЏ РґРѕР»Р¶РЅР° СЃСѓС‰РµСЃС‚РІРѕРІР°С‚СЊ РІ РјР°РЅРёС„РµСЃС‚Рµ
 	manifest := a.manifestCache
 	if manifest == nil {
 		var err error
@@ -1351,7 +1375,7 @@ func (a *API) handleInstallVersion(c *gin.Context) {
 		manifest, err = a.downloadMgr.FetchManifest()
 		if err != nil {
 			log.L().Error("install version: failed to fetch manifest", "version", req.VersionID, "error", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось загрузить список версий. Проверьте интернет-соединение."})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "РЅРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ СЃРїРёСЃРѕРє РІРµСЂСЃРёР№. РџСЂРѕРІРµСЂСЊС‚Рµ РёРЅС‚РµСЂРЅРµС‚-СЃРѕРµРґРёРЅРµРЅРёРµ."})
 			return
 		}
 	}
@@ -1365,7 +1389,7 @@ func (a *API) handleInstallVersion(c *gin.Context) {
 	}
 	if !found {
 		log.L().Warn("install version: version not in manifest", "version", req.VersionID)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "версия " + req.VersionID + " не найдена. Возможно, она была удалена из манифеста."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "РІРµСЂСЃРёСЏ " + req.VersionID + " РЅРµ РЅР°Р№РґРµРЅР°. Р’РѕР·РјРѕР¶РЅРѕ, РѕРЅР° Р±С‹Р»Р° СѓРґР°Р»РµРЅР° РёР· РјР°РЅРёС„РµСЃС‚Р°."})
 		return
 	}
 
@@ -1416,7 +1440,7 @@ func (a *API) handleInstallVersion(c *gin.Context) {
 				a.publishProgress(req.VersionID, types.ProgressInfo{Task: "error", Percent: 0})
 			}
 		} else {
-			// Создать профиль в launcher_profiles.json
+			// РЎРѕР·РґР°С‚СЊ РїСЂРѕС„РёР»СЊ РІ launcher_profiles.json
 			now := time.Now().UTC().Format(time.RFC3339)
 			profile := profiles.Profile{
 				ID:            req.VersionID,
@@ -1531,7 +1555,7 @@ func (a *API) handleShutdown(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "shutting down"})
 }
 
-// CancelAllInstallations отменяет все активные установки (вызывается при graceful shutdown)
+// CancelAllInstallations РѕС‚РјРµРЅСЏРµС‚ РІСЃРµ Р°РєС‚РёРІРЅС‹Рµ СѓСЃС‚Р°РЅРѕРІРєРё (РІС‹Р·С‹РІР°РµС‚СЃСЏ РїСЂРё graceful shutdown)
 func (a *API) CancelAllInstallations() {
 	a.cancelMu.Lock()
 	defer a.cancelMu.Unlock()
