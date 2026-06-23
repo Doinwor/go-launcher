@@ -1168,26 +1168,22 @@ input[type="checkbox"]:checked::after {
 .toast.error .toast-icon { color: var(--red); }
 .toast.info .toast-icon { color: var(--blue); }
 
-/* ===== Update Banner ===== */
-#update-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 20px;
-  background: linear-gradient(135deg, rgba(91, 227, 123, 0.1), rgba(91, 227, 123, 0.05));
-  border-bottom: 1px solid var(--accent);
-  font-size: 13px;
-  animation: slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+/* ===== Update Modal ===== */
+#update-modal .modal {
+  animation: popIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-100%); }
-  to { opacity: 1; transform: translateY(0); }
+#update-modal i.bi-download {
+  display: inline-block;
+  animation: float 2s ease-in-out infinite;
 }
-
-#update-banner i { font-size: 18px; color: var(--accent); }
-#update-banner span { flex: 1; color: var(--text); font-weight: 500; }
-.update-banner-actions { display: flex; gap: 6px; }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
 
 /* ===== Spinner ===== */
 .spinner-wrap {
@@ -1249,6 +1245,7 @@ input[type="checkbox"]:checked::after {
   .version-grid { grid-template-columns: 1fr; }
   .loader-cards { grid-template-columns: 1fr; }
 }
+
 </style>
 </head>
 <body>
@@ -1281,7 +1278,7 @@ input[type="checkbox"]:checked::after {
       <button onclick="shutdownLauncher()" title="Закрыть лаунчер" class="btn-shutdown">
         <i class="bi bi-power"></i>
       </button>
-      <span style="font-size:11px;color:var(--text-muted);align-self:center">v1.0.0</span>
+      <span id="launcher-version" style="font-size:11px;color:var(--text-muted);align-self:center"></span>
     </div>
   </aside>
 
@@ -1452,6 +1449,24 @@ input[type="checkbox"]:checked::after {
           <button class="btn btn-danger" onclick="shutdownLauncher()" style="width:fit-content">
             <i class="bi bi-power"></i> Закрыть лаунчер
           </button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0">
+        <div class="settings-group">
+          <div class="group-title">О программе</div>
+          <div style="font-size:13px;color:var(--text);line-height:1.6">
+            <div style="margin-bottom:4px"><strong>Go Launcher</strong> <span id="about-version">v1.0.0</span></div>
+            <div style="color:var(--text-muted);font-size:12px">Офлайн-лаунчер для Minecraft</div>
+            <div style="color:var(--text-muted);font-size:12px;margin-top:2px">Разработано студией <strong>i.studio</strong></div>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="checkForUpdates(); toast('Проверка обновлений...', 'info')">
+              <i class="bi bi-arrow-clockwise"></i> Проверить обновления
+            </button>
+            <a href="https://github.com/Doinwor/go-launcher" target="_blank" class="btn btn-sm">
+              <i class="bi bi-github"></i> GitHub
+            </a>
+          </div>
         </div>
       </div>
 
@@ -1647,13 +1662,25 @@ input[type="checkbox"]:checked::after {
   </div>
 </div>
 
-<!-- Update Banner -->
-<div id="update-banner" style="display:none">
-  <i class="bi bi-download"></i>
-  <span id="update-banner-text">Доступно обновление v1.1.0</span>
-  <div class="update-banner-actions">
-    <a id="update-banner-link" href="#" target="_blank" class="btn btn-sm btn-primary">Скачать</a>
-    <button class="btn btn-sm" onclick="dismissUpdate()">Позже</button>
+<!-- Update Modal -->
+<div class="modal-overlay" id="update-modal">
+  <div class="modal" style="max-width:440px;text-align:center">
+    <div class="modal-header" style="justify-content:center;border:none;padding-bottom:0">
+      <h2><i class="bi bi-download" style="color:var(--accent);font-size:28px"></i></h2>
+    </div>
+    <div class="modal-body" style="padding:20px 28px">
+      <h3 style="font-size:20px;margin-bottom:8px">Доступно обновление</h3>
+      <p style="color:var(--text-secondary);font-size:13px;line-height:1.6;margin-bottom:4px">
+        Вышла новая версия лаунчера <strong id="update-modal-version">v1.0.0</strong>.
+      </p>
+      <p style="color:var(--text-muted);font-size:12px">
+        Рекомендуем установить последнюю версию для новых функций и исправлений.
+      </p>
+    </div>
+    <div class="modal-footer" style="border:none;padding:0 28px 24px;justify-content:center;gap:10px">
+      <a id="update-modal-link" href="https://doinwor.github.io/go-launcher/release.html" target="_blank" class="btn btn-primary"><i class="bi bi-download"></i> Скачать сейчас</a>
+      <button class="btn" onclick="dismissUpdate()">Напомнить позже</button>
+    </div>
   </div>
 </div>
 
@@ -1736,22 +1763,49 @@ async function saveSettingsField(key, value) {
 }
 
 /* ===== Update Notification ===== */
+function showUpdateModal(version) {
+  document.getElementById('update-modal-version').textContent = 'v' + version;
+  document.getElementById('update-modal-link').href = 'https://doinwor.github.io/go-launcher/release.html?v=' + version + '&from=launcher';
+  showModal('update-modal');
+}
+
 async function checkForUpdates() {
   try {
     const r = await api('/api/update/check-github');
-    if (r.hasUpdate) {
-      const banner = document.getElementById('update-banner');
-      document.getElementById('update-banner-text').textContent =
-        'Доступно обновление v' + r.latest;
-      const link = document.getElementById('update-banner-link');
-      link.href = 'https://github.com/Doinwor/go-launcher/releases/latest';
-      banner.style.display = 'flex';
+    console.log('backend update check:', r);
+    if (r.hasUpdate) showUpdateModal(r.latest);
+  } catch (e) { console.warn('Update check failed:', e); }
+}
+
+// Client-side fallback: fetch GitHub releases directly from browser
+async function checkForUpdatesClientSide() {
+  try {
+    toast('Проверка обновлений...', 'info');
+    console.log('client-side check: fetching from GitHub API');
+    const res = await fetch('https://api.github.com/repos/Doinwor/go-launcher/releases/latest');
+    if (!res.ok) {
+      console.warn('client-side check: HTTP', res.status);
+      toast('Ошибка проверки: HTTP ' + res.status, 'error');
+      return;
     }
-  } catch (_) {}
+    const data = await res.json();
+    const latest = (data.tag_name || '').replace(/^v/, '');
+    const current = state.settings ? state.settings.launcherVersion : '';
+    console.log('client-side check: current=' + current + ' latest=' + latest);
+    toast('Текущая: ' + current + ', последняя: ' + latest, 'info');
+    if (latest && current && latest !== current) {
+      showUpdateModal(latest);
+    } else {
+      toast('У вас актуальная версия', 'success');
+    }
+  } catch (e) {
+    console.warn('Client-side update check failed:', e);
+    toast('Не удалось проверить обновления: ' + e.message, 'error');
+  }
 }
 
 function dismissUpdate() {
-  document.getElementById('update-banner').style.display = 'none';
+  closeModal('update-modal');
 }
 
 function confirmDialog(title, text, cb) {
@@ -1799,7 +1853,8 @@ async function loadProfiles() {
 
 function renderProfiles() {
   const list = document.getElementById('profile-list');
-  const ids = Object.keys(state.profiles);
+  // Filter out account profiles (type "offline")
+  const ids = Object.keys(state.profiles).filter(id => state.profiles[id].type !== 'offline');
   if (ids.length === 0) {
     list.innerHTML = `
       <div class="empty-state" style="padding:20px 8px">
@@ -1950,6 +2005,9 @@ function shutdownLauncher() {
 
 function showLoginModal() {
   document.getElementById('login-username').value = state.account ? state.account.username : '';
+  document.querySelector('#login-modal .modal-header h2').textContent = state.account ? 'Сменить никнейм' : 'Вход в аккаунт';
+  document.querySelector('#login-modal .modal-body label').textContent = state.account ? 'Новый никнейм' : 'Игровой никнейм';
+  document.querySelector('#login-modal .btn-primary').innerHTML = state.account ? '<i class="bi bi-pencil"></i> Сменить' : '<i class="bi bi-box-arrow-in-right"></i> Войти';
   showModal('login-modal');
   setTimeout(() => document.getElementById('login-username').focus(), 100);
 }
@@ -1960,14 +2018,24 @@ async function doLogin() {
   if (username.length > 16) return toast('Никнейм слишком длинный (макс. 16 символов)', 'error');
 
   try {
-    await api('/api/auth/offline/login', {
-      method: 'POST',
-      body: JSON.stringify({ username }),
-    });
-    closeModal('login-modal');
-    toast('Вход выполнен!', 'success');
+    if (state.account) {
+      await api('/api/auth/rename', {
+        method: 'POST',
+        body: JSON.stringify({ username }),
+      });
+      closeModal('login-modal');
+      toast('Никнейм изменён!', 'success');
+    } else {
+      await api('/api/auth/offline/login', {
+        method: 'POST',
+        body: JSON.stringify({ username }),
+      });
+      closeModal('login-modal');
+      toast('Вход выполнен!', 'success');
+    }
     await loadAccount();
     await loadProfiles();
+    updatePlayButton();
   } catch (e) {
     toast(e.message, 'error');
   }
@@ -2026,7 +2094,27 @@ async function pollGameStatus() {
       state.gamePid = null;
       updatePlayButton();
       if (playStatusInterval) { clearInterval(playStatusInterval); playStatusInterval = null; }
-      document.getElementById('play-status').innerHTML = '<span>Игра завершена</span>';
+      const statusEl = document.getElementById('play-status');
+      if (s.exitCode && s.exitCode !== 0) {
+        if (s.manuallyStopped) {
+          statusEl.innerHTML = '<span>Игра остановлена</span>';
+        } else {
+          let html = `<span style="color:var(--red)">Minecraft завершился с ошибкой (код ${s.exitCode})</span>`;
+          if (s.crashAdvice) {
+            html += `<div style="margin-top:8px;padding:8px 10px;background:rgba(255,68,68,0.08);border-radius:8px;font-size:12px">
+              <div style="font-weight:600;color:var(--red);margin-bottom:4px">${escapeHtml(s.crashAdvice.title)}</div>
+              <div style="color:var(--text);line-height:1.4">${escapeHtml(s.crashAdvice.advice)}</div>
+            </div>`;
+            if (s.crashAdvice.details) {
+              html += `<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">${escapeHtml(s.crashAdvice.details)}</div>`;
+            }
+          }
+          statusEl.innerHTML = html;
+          toast(`Minecraft завершился с ошибкой (код ${s.exitCode})`, 'error');
+        }
+      } else {
+        statusEl.innerHTML = '<span>Игра завершена</span>';
+      }
     }
   } catch (_) {}
 }
@@ -2626,6 +2714,17 @@ async function loadSettings() {
     document.getElementById('set-auth-injector').checked = s.useAuthlibInjector || false;
     document.getElementById('set-auth-server').checked = s.authServerEnabled || false;
     document.getElementById('set-auto-update').checked = s.checkUpdates !== false;
+    document.getElementById('launcher-version').textContent = s.launcherVersion ? 'v' + s.launcherVersion : 'v1.0.0';
+    document.getElementById('about-version').textContent = s.launcherVersion ? 'v' + s.launcherVersion : 'v1.0.0';
+    // Show update modal if a newer version exists
+    if (s.updateAvailable && s.updateLatestVersion) {
+      showUpdateModal(s.updateLatestVersion);
+    } else if (s.updateLatestVersion && s.launcherVersion && s.updateLatestVersion !== s.launcherVersion) {
+      showUpdateModal(s.updateLatestVersion);
+    } else {
+      // Fallback: client-side check directly from browser
+      checkForUpdatesClientSide();
+    }
     updateMemLabels();
   } catch (e) {
     toast('Не удалось загрузить настройки: ' + e.message, 'error');
@@ -2753,9 +2852,9 @@ async function init() {
     showModal('onboarding-modal');
   }
 
-  // Update check
+  // Update check — fallback if settings load didn't trigger it
   if (!state.settings || state.settings.checkUpdates !== false) {
-    setTimeout(checkForUpdates, 3000);
+    setTimeout(checkForUpdates, 5000);
   }
 
   // Keyboard shortcut: Escape closes modals

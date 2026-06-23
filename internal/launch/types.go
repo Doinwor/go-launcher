@@ -88,8 +88,18 @@ type LogEntry struct {
 }
 
 type ProcessStatus struct {
-	Running bool   `json:"running"`
-	PID     int    `json:"pid"`
-	Version string `json:"version,omitempty"`
-	Account string `json:"account,omitempty"`
+	Running        bool          `json:"running"`
+	PID            int           `json:"pid"`
+	Version        string        `json:"version,omitempty"`
+	Account        string        `json:"account,omitempty"`
+	ExitCode       int           `json:"exitCode,omitempty"`
+	ExitError      string        `json:"exitError,omitempty"`
+	CrashAdvice    *CrashAdvice  `json:"crashAdvice,omitempty"`
+	ManuallyStopped bool         `json:"manuallyStopped,omitempty"`
+}
+
+type CrashAdvice struct {
+	Title   string `json:"title"`
+	Advice  string `json:"advice"`
+	Details string `json:"details,omitempty"`
 }

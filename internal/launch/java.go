@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/offline-launcher/internal/log"
 )
@@ -212,6 +213,9 @@ func ParseJavaVersion(output string) (int, error) {
 
 func CheckJavaVersion(javaPath string) (int, error) {
 	cmd := exec.Command(javaPath, "-version")
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, fmt.Errorf("java check failed: %w", err)

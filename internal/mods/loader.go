@@ -8,7 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 )
 
 type FabricMeta struct {
@@ -268,6 +270,9 @@ func installFabric(mcVersion, loaderVersion, mcDir, javaPath string) (*InstallLo
 	cmd := exec.Command(javaPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("fabric installer failed: %w", err)
@@ -307,6 +312,9 @@ func installQuilt(mcVersion, loaderVersion, mcDir, javaPath string) (*InstallLoa
 	cmd := exec.Command(javaPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("quilt installer failed: %w", err)
@@ -341,6 +349,9 @@ func installForge(mcVersion, forgeVersion, mcDir, javaPath string) (*InstallLoad
 	cmd := exec.Command(javaPath, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	}
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("forge installer failed: %w", err)

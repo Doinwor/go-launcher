@@ -9,9 +9,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
@@ -29,6 +32,40 @@ import (
 var webFiles embed.FS
 
 var version = "dev"
+
+func killProcessOnPort(port string) {
+	if runtime.GOOS == "windows" {
+		cmd := exec.Command("netstat", "-ano")
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		out, err := cmd.Output()
+		if err != nil {
+			return
+		}
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, ":"+port) && strings.Contains(line, "LISTENING") {
+				parts := strings.Fields(line)
+				if len(parts) > 4 {
+					pid := parts[len(parts)-1]
+					kill := exec.Command("taskkill", "/F", "/PID", pid)
+					kill.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+					kill.Run()
+				}
+			}
+		}
+	} else {
+		// Linux / macOS
+		out, err := exec.Command("lsof", "-ti", ":"+port).Output()
+		if err != nil {
+			return
+		}
+		pid := strings.TrimSpace(string(out))
+		if pid != "" {
+			exec.Command("kill", "-9", pid).Run()
+		}
+	}
+}
 
 func main() {
 	defer recoverPanic()
@@ -57,33 +94,49 @@ func main() {
 
 	srv := server.New(authMgr, profileStore, settingsMgr, launchCfg)
 
-	staticDir := findStaticDir()
 	var embeddedFS fs.FS
-	if staticDir == "" {
-		sub, err := fs.Sub(webFiles, "web")
-		if err != nil {
-			log.L().Error("failed to create embedded filesystem", "error", err)
+	sub, err := fs.Sub(webFiles, "web")
+	if err != nil {
+		log.L().Error("failed to create embedded filesystem", "error", err)
+		staticDir := findStaticDir()
+		if staticDir == "" {
 			os.Exit(1)
 		}
+		log.L().Warn("using static web directory", "path", staticDir)
+	} else {
 		embeddedFS = sub
+		log.L().Info("using embedded web files")
 	}
-	router := srv.SetupRouter(staticDir, embeddedFS)
+	router := srv.SetupRouter("", embeddedFS)
 
 	port := "8080"
 	if p := os.Getenv("LAUNCHER_PORT"); p != "" {
 		port = p
 	}
 
-	// Проверка: не занят ли порт другим лаунчером
+	// Убиваем старый процесс на этом порту, если есть
 	addr := ":" + port
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.L().Error("port " + port + " already in use — возможно, лаунчер уже запущен")
-		fmt.Fprintf(os.Stderr, "ОШИБКА: порт %s уже занят. Возможно, лаунчер уже запущен.\n", port)
-		fmt.Fprintf(os.Stderr, "Завершите предыдущий процесс или укажите другой порт через LAUNCHER_PORT.\n")
-		os.Exit(1)
+	if ln, err := net.Listen("tcp", addr); err != nil {
+		log.L().Info("port " + port + " already in use — убиваем старый процесс")
+		killProcessOnPort(port)
+		// Повторяем попытку
+		var retryErr error
+		for i := 0; i < 5; i++ {
+			var retryLn net.Listener
+			retryLn, retryErr = net.Listen("tcp", addr)
+			if retryErr == nil {
+				retryLn.Close()
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if retryErr != nil {
+			log.L().Error("port " + port + " still in use after killing process")
+			os.Exit(1)
+		}
+	} else {
+		ln.Close()
 	}
-	ln.Close()
 
 	httpSrv := &http.Server{
 		Addr:    addr,
