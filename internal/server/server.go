@@ -198,6 +198,7 @@ func (a *API) SetupRouter(staticDir string, embeddedFS fs.FS) *gin.Engine {
 		updateGroup := api.Group("/update")
 		{
 			updateGroup.GET("/check", a.handleUpdateCheck)
+			updateGroup.GET("/check-github", a.handleUpdateCheckGitHub)
 			updateGroup.POST("/apply", a.handleUpdateApply)
 			updateGroup.GET("/status", a.handleUpdateStatus)
 		}
@@ -1209,6 +1210,15 @@ func (a *API) handleSkinInfo(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func (a *API) handleUpdateCheckGitHub(c *gin.Context) {
+	result, err := update.CheckGitHub()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 func (a *API) handleUpdateCheck(c *gin.Context) {

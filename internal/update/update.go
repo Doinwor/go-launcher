@@ -19,6 +19,8 @@ import (
 
 const CurrentVersion = "1.0.0"
 
+const GitHubReleasesURL = "https://api.github.com/repos/Doinwor/go-launcher/releases/latest"
+
 var DefaultManifestURL = "https://your-update-server.com/update.json"
 
 type Manifest struct {
@@ -58,6 +60,63 @@ func Status() map[string]interface{} {
 		"done":        status.done,
 		"error":       status.err,
 	}
+}
+
+func CheckGitHub() (*CheckResult, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := http.NewRequest("GET", GitHubReleasesURL, nil)
+	if err != nil {
+		return &CheckResult{
+			HasUpdate: false,
+			Current:   CurrentVersion,
+			Latest:    CurrentVersion,
+			Error:     fmt.Sprintf("request failed: %v", err),
+		}, nil
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "go-launcher/"+CurrentVersion)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return &CheckResult{
+			HasUpdate: false,
+			Current:   CurrentVersion,
+			Latest:    CurrentVersion,
+			Error:     fmt.Sprintf("GitHub unreachable: %v", err),
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return &CheckResult{
+			HasUpdate: false,
+			Current:   CurrentVersion,
+			Latest:    CurrentVersion,
+			Error:     fmt.Sprintf("GitHub HTTP %d", resp.StatusCode),
+		}, nil
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		HTMLURL string `json:"html_url"`
+		Body    string `json:"body"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, fmt.Errorf("parse release: %w", err)
+	}
+
+	hasUpdate := compareVersions(strings.TrimPrefix(release.TagName, "v"), CurrentVersion) > 0
+
+	result := &CheckResult{
+		HasUpdate: hasUpdate,
+		Current:   CurrentVersion,
+		Latest:    strings.TrimPrefix(release.TagName, "v"),
+	}
+	if hasUpdate {
+		result.Changelog = release.Body
+	}
+
+	return result, nil
 }
 
 func Check(manifestURL string) (*CheckResult, error) {

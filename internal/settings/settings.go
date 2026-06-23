@@ -23,6 +23,7 @@ type AppSettings struct {
 	AuthServerEnabled  bool   `json:"authServerEnabled"`
 	AuthServerPort     int    `json:"authServerPort"`
 	CurseForgeKey      string `json:"curseForgeKey,omitempty"`
+	FirstLaunch        bool   `json:"firstLaunch"`
 }
 
 type Manager struct {
@@ -54,6 +55,7 @@ func DefaultSettings() *AppSettings {
 		AuthlibInjectorURL: "http://localhost:25566",
 		AuthServerEnabled:  false,
 		AuthServerPort:     25566,
+		FirstLaunch:        true,
 	}
 }
 
